@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { toggleSidebar } from "@/lib/feature/sidebar/sidebarSlice";
 import Link from "next/link";
 import { FaChevronDown, FaChevronUp, FaBars, FaTimes } from "react-icons/fa"; // Importing React Icons
-import { sidebarLinks } from "../sidebarLinks"; // Assuming the updated sidebarLinks are imported
+import { sidebarLinks } from "../SidebarLinks"; // Assuming the updated sidebarLinks are imported
 
 const SidebarDash = ({ role }) => {
   const dispatch = useDispatch();
