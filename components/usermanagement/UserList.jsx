@@ -1,181 +1,202 @@
-import React, { useState } from "react";
-import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-  getPaginationRowModel,
-} from "@tanstack/react-table";
-import UserEditModal from "./UserEditModal";
-import { useUserManagement } from "../../hooks/useUserManagement";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent } from "@/components/ui/card";
+import { Pencil, Trash2 } from "lucide-react";
+import { useUserManagement } from "@/hooks/useUserManagement";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-const UserList = ({ users, onEdit, onDelete }) => {
-  const { handleSave } = useUserManagement();
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+import DefaultAvatar from "../../public/useradmin.jpg";
+import Image from "next/image";
 
-  const handleEditClick = (user) => {
-    setSelectedUser(user);
-    setIsModalOpen(true);
+export default function UserTable() {
+  const { users, setUsers } = useUserManagement();
+  const router = useRouter();
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const usersPerPage = 13;
+
+  // Calculate Pagination
+  const totalPages = Math.ceil(users.length / usersPerPage);
+  const indexOfLastUser = currentPage * usersPerPage;
+  const indexOfFirstUser = indexOfLastUser - usersPerPage;
+  const currentUsers = users.slice(indexOfFirstUser, indexOfLastUser);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+
+    try {
+      const token = localStorage.getItem("access");
+
+      if (!token) {
+        alert("Unauthorized: No token found.");
+        return;
+      }
+
+      const response = await fetch(
+        `http://13.51.157.149/api/users/users/${id}/`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to delete user.");
+      }
+
+      setUsers(users.filter((user) => user.id !== id));
+      toast.success("User deleted successfully");
+    } catch (error) {
+      console.error("Error deleting user:", error.message);
+      alert(`Error: ${error.message}`);
+    }
   };
 
-  const handleSavedata = (updatedUser) => {
-    handleSave(updatedUser);
-    setIsModalOpen(false);
+  const handleEditClick = (id) => {
+    router.push(`/dashboard/admin/users/edit/${id}`);
   };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedUser(null);
-  };
-
-  const columns = [
-    { accessorKey: "username", header: "Username" },
-    { accessorKey: "email", header: "Email" },
-    { accessorKey: "role", header: "Role" },
-    { accessorKey: "address", header: "Address" },
-    { accessorKey: "phone_number", header: "Phone Number" },
-  ];
-
-  const table = useReactTable({
-    data: users,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: 10 } },
-  });
 
   return (
-    <div className="p-4 border rounded-xl bg-white shadow-lg">
-      <h3 className="text-xl font-bold mb-4">User List</h3>
-
-      {/* Table for Desktop with Pagination */}
-      <div className="hidden md:block overflow-x-auto">
-        <table className="w-full border border-gray-200 rounded-lg shadow-sm">
-          <thead className="bg-gray-100 text-gray-800 text-left">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <th key={header.id} className="p-3 border-b">
-                    {flexRender(
-                      header.column.columnDef.header,
-                      header.getContext()
-                    )}
-                  </th>
-                ))}
-                <th className="p-3 border-b">Actions</th>
+    <Card>
+      <CardContent className="p-4">
+        {/* Desktop Table View */}
+        <div className="hidden lg:block">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b">
+                <th className="p-2">Profile</th>
+                <th className="p-2 text-left">Username</th>
+                <th className="p-2 text-left">Email</th>
+                <th className="p-2 text-left">Role</th>
+                <th className="p-2 text-left">Address</th>
+                <th className="p-2 text-left">Phone</th>
+                <th className="p-2 text-left">Active</th>
+                <th className="p-2 text-left">Validated</th>
+                <th className="p-2 text-left">Actions</th>
               </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-b hover:bg-blue-50 transition">
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="p-3 border-r">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            </thead>
+            <tbody>
+              {currentUsers.map((user) => (
+                <tr key={user.id} className="border-b">
+                  <td className="p-2">
+                    <div className="w-10 h-10 relative">
+                      <Image
+                        src={user?.profile_picture || DefaultAvatar}
+                        alt={user.username}
+                        fill // Makes the image fill the div
+                        className="rounded-full object-cover"
+                      />
+                    </div>
                   </td>
-                ))}
-                <td className="p-3">
-                  <button
-                    onClick={() => handleEditClick(row.original)}
-                    className="px-3 py-1 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600 transition"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => onDelete(row.original.id)}
-                    className="ml-2 px-3 py-1 text-sm bg-red-500 text-white rounded-md hover:bg-red-600 transition"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  <td className="p-2">{user.username}</td>
+                  <td className="p-2">{user.email}</td>
+                  <td className="p-2">{user.role}</td>
+                  <td className="p-2">{user.address}</td>
+                  <td className="p-2">{user.phone_number}</td>
+                  <td className="p-2">
+                    <Checkbox checked={user.is_active} disabled />
+                  </td>
+                  <td className="p-2">
+                    <Checkbox checked={user.is_verified} disabled />
+                  </td>
+                  <td className="p-2 flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleEditClick(user.id)}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDelete(user.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
+        {/* Mobile Card View */}
+        <div className="lg:hidden space-y-4">
+          {currentUsers.map((user) => (
+            <Card key={user.id} className="border p-4 shadow-sm">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 relative">
+                    <Image
+                      src={user?.profile_picture || DefaultAvatar}
+                      alt={user.username}
+                      fill // Makes the image fill the div
+                      className="rounded-full object-cover"
+                    />
+                  </div>
+                  <h3 className="text-lg font-semibold">{user.username}</h3>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleEditClick(user.id)}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleDelete(user.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500">{user.email}</p>
+              <p className="text-sm">{user.role}</p>
+              <p className="text-sm">{user.address}</p>
+              <p className="text-sm">{user.phone_number}</p>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-sm">Active:</span>
+                <Checkbox checked={user.is_active} disabled />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">Validated:</span>
+                <Checkbox checked={user.is_verified} disabled />
+              </div>
+            </Card>
+          ))}
+        </div>
         {/* Pagination Controls */}
         <div className="flex justify-between items-center mt-4">
-          <button
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-            className={`px-4 py-2 text-sm border rounded ${
-              !table.getCanPreviousPage()
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:bg-gray-100"
-            }`}
+          <Button
+            variant="outline"
+            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+            disabled={currentPage === 1}
           >
             Previous
-          </button>
-
-          <span>
-            Page {table.getState().pagination.pageIndex + 1} of{" "}
-            {table.getPageCount()}
+          </Button>
+          <span className="text-sm font-semibold">
+            Page {currentPage} of {totalPages}
           </span>
-
-          <button
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-            className={`px-4 py-2 text-sm border rounded ${
-              !table.getCanNextPage()
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:bg-gray-100"
-            }`}
+          <Button
+            variant="outline"
+            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+            disabled={currentPage === totalPages}
           >
             Next
-          </button>
+          </Button>
         </div>
-      </div>
-
-      {/* Cards for Mobile */}
-      <div className="md:hidden space-y-4">
-        {users.map((user) => (
-          <div
-            key={user.id}
-            className="p-4 border rounded-lg shadow-md bg-gray-50"
-          >
-            <p className="text-lg font-semibold">{user.username}</p>
-            <p className="text-sm text-gray-700">{user.email}</p>
-            <p
-              className={`text-xs font-semibold px-2 py-1 rounded-lg w-fit ${
-                user.role === "admin"
-                  ? "bg-blue-100 text-blue-600"
-                  : "bg-green-100 text-green-600"
-              }`}
-            >
-              {user.role}
-            </p>
-            <p className="text-sm text-gray-700">
-              Address: {user.address || "N/A"}
-            </p>
-            <p className="text-sm text-gray-700">
-              Phone: {user.phone_number || "N/A"}
-            </p>
-            <div className="mt-2 flex gap-2">
-              <button
-                onClick={() => handleEditClick(user)}
-                className="px-3 py-1 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600 transition"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => onDelete(user.id)}
-                className="px-3 py-1 text-sm bg-red-500 text-white rounded-md hover:bg-red-600 transition"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <UserEditModal
-        user={selectedUser}
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        onSave={handleSavedata}
-      />
-    </div>
+      </CardContent>
+    </Card>
   );
-};
-
-export default UserList;
+}

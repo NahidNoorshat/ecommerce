@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const UserEditModal = ({ user, isOpen, onClose, onSave }) => {
+const UserEditModal = ({ user, isOpen, onClose, onSave, refreshData }) => {
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -28,9 +28,12 @@ const UserEditModal = ({ user, isOpen, onClose, onSave }) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = () => {
-    onSave(formData);
-    onClose(); // Close modal after saving
+  const handleSubmit = async () => {
+    const updatedUserData = await onSave(formData);
+    refreshData();
+    if (updatedUserData) {
+      onClose(); // Close modal only if the update was successful
+    }
   };
 
   if (!isOpen) return null;

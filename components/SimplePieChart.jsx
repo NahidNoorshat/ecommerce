@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import {
   PieChart,
@@ -9,19 +11,9 @@ import {
 } from "recharts";
 import { useTheme } from "next-themes";
 
-// Sample data for the pie chart
-const data = [
-  { name: "Category A", value: 400 },
-  { name: "Category B", value: 300 },
-  { name: "Category C", value: 200 },
-  { name: "Category D", value: 278 },
-  { name: "Category E", value: 189 },
-];
+const SimplePieChart = ({ data }) => {
+  const { theme } = useTheme();
 
-const SimplePieChart = () => {
-  const { theme } = useTheme(); // Get the current theme
-
-  // Define styles for light and dark modes
   const styles = {
     light: {
       background: "#fff",
@@ -29,7 +21,7 @@ const SimplePieChart = () => {
       tooltipBackground: "#fff",
       tooltipText: "#333",
       legendColor: "#333",
-      colors: ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#a4de6c"], // Pie chart colors for light mode
+      colors: ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#a4de6c"],
     },
     dark: {
       background: "#1e1e1e",
@@ -37,12 +29,27 @@ const SimplePieChart = () => {
       tooltipBackground: "#333",
       tooltipText: "#fff",
       legendColor: "#ccc",
-      colors: ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#a4de6c"], // Pie chart colors for dark mode
+      colors: ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#a4de6c"],
     },
   };
 
-  // Select the appropriate styles based on the current theme
   const currentStyles = theme === "dark" ? styles.dark : styles.light;
+
+  if (!data || data.length === 0) {
+    return (
+      <div
+        style={{
+          background: currentStyles.background,
+          padding: "20px",
+          borderRadius: "8px",
+          textAlign: "center",
+          color: currentStyles.textColor,
+        }}
+      >
+        No data available for selected range.
+      </div>
+    );
+  }
 
   return (
     <div
@@ -63,12 +70,12 @@ const SimplePieChart = () => {
             outerRadius={100}
             fill="#8884d8"
             dataKey="value"
-            nameKey="name"
+            nameKey="status"
           >
             {data.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
-                fill={currentStyles.colors[index % currentStyles.colors.length]} // Dynamic colors
+                fill={currentStyles.colors[index % currentStyles.colors.length]}
               />
             ))}
           </Pie>
@@ -82,7 +89,7 @@ const SimplePieChart = () => {
           />
           <Legend
             wrapperStyle={{
-              color: currentStyles.legendColor, // Dynamic legend text color
+              color: currentStyles.legendColor,
             }}
           />
         </PieChart>

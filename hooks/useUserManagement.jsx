@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+const API_BASE_URL = "http://13.51.157.149/api";
 
 export const useUserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -115,6 +115,7 @@ export const useUserManagement = () => {
         throw new Error("Failed to update user");
       }
 
+      // Update the users list state immediately with the new data
       setUsers((prevUsers) =>
         prevUsers.map((user) =>
           user.id === updatedUser.id ? response.data : user
@@ -123,7 +124,9 @@ export const useUserManagement = () => {
 
       setIsEditing(false);
       setSelectedUser(null);
-      setError(null); // Clear previous errors
+      setError(null);
+
+      return response.data; // Return the updated user data
     } catch (error) {
       console.error(
         "Error updating user:",
@@ -135,6 +138,7 @@ export const useUserManagement = () => {
 
   return {
     users,
+    setUsers,
     selectedUser,
     isEditing,
     error,
@@ -143,5 +147,6 @@ export const useUserManagement = () => {
     handleSave,
     addUser,
     setSelectedUser,
+    fetchUsers,
   };
 };

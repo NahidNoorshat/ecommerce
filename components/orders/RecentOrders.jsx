@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { ORDERS_API } from "@/utils/config";
+import { secureFetch } from "@/lib/api/secureFetch";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableHeader,
@@ -11,7 +16,6 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import axios from "axios";
 
 const statusColors = {
   pending: "bg-yellow-500 text-white",
@@ -28,88 +32,241 @@ const paymentStatusColors = {
   refunded: "bg-blue-500 text-white",
 };
 
-export default function RecentOrders() {
+const orderStatusOptions = [
+  "pending",
+  "processing",
+  "shipped",
+  "delivered",
+  "cancelled",
+];
+const paymentStatusOptions = ["pending", "paid", "failed", "refunded"];
+const paymentMethodOptions = ["cod", "card", "paypal", "crypto"];
+
+export default function RecentOrders({ status = "" }) {
+  const router = useRouter();
   const [orders, setOrders] = useState([]);
+  const [selectedOrders, setSelectedOrders] = useState([]);
+  const [search, setSearch] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 5;
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const response = await axios.get(
-          "http://127.0.0.1:8000/api/orders/orders/",
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("access")}`,
-            },
-          }
-        );
-        setOrders(response.data);
-        console.log(response.data, "This is order details..");
-      } catch (error) {
-        console.error("Error fetching orders:", error);
-      }
-    };
-
     fetchOrders();
-  }, []);
+  }, [status, search, paymentStatus, paymentMethod]);
+
+  const fetchOrders = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (status) params.append("status", status);
+      if (search) params.append("search", search);
+      if (paymentStatus) params.append("payment_status", paymentStatus);
+      if (paymentMethod) params.append("payment_method", paymentMethod);
+
+      const res = await secureFetch(
+        `${ORDERS_API}/orders/?${params.toString()}`
+      );
+      const data = await res.json();
+      setOrders(data);
+    } catch {
+      toast.error("Failed to fetch orders!");
+    }
+  };
+
+  const handleStatusChange = async (orderId, newStatus) => {
+    await secureFetch(`${ORDERS_API}/orders/${orderId}/update_status/`, {
+      method: "POST",
+      body: JSON.stringify({ status: newStatus }),
+    });
+    fetchOrders();
+    toast.success("Status Updated!");
+  };
+
+  const handlePaymentStatusChange = async (orderId, newStatus) => {
+    await secureFetch(
+      `${ORDERS_API}/orders/${orderId}/update_payment_status/`,
+      {
+        method: "POST",
+        body: JSON.stringify({ payment_status: newStatus }),
+      }
+    );
+    fetchOrders();
+    toast.success("Payment Status Updated!");
+  };
+
+  const handleBulkDelete = async () => {
+    await secureFetch(`${ORDERS_API}/orders/bulk_delete/`, {
+      method: "POST",
+      body: JSON.stringify({ order_ids: selectedOrders }),
+    });
+    fetchOrders();
+    setSelectedOrders([]);
+    toast.success("Selected Orders Deleted!");
+  };
+
+  const indexOfLastOrder = currentPage * ordersPerPage;
+  const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
+  const currentOrders = orders.slice(indexOfFirstOrder, indexOfLastOrder);
 
   return (
-    <Card className="p-5 shadow-md rounded-xl bg-white dark:bg-gray-900">
-      <h2 className="text-xl font-semibold mb-4 dark:text-white">
-        Recent Orders
-      </h2>
+    <Card className="p-5 shadow-md rounded-xl bg-white dark:bg-gray-900 mt-14">
+      {/* Filters & Search */}
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4">
+        <h2 className="text-xl font-semibold dark:text-white">
+          Orders Management
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          <input
+            type="text"
+            placeholder="Search by Order ID / Customer / Phone"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="border border-gray-300 rounded px-3 py-2 w-52"
+          />
+          <select
+            value={paymentStatus}
+            onChange={(e) => setPaymentStatus(e.target.value)}
+            className="border p-2 rounded"
+          >
+            <option value="">All Payment Status</option>
+            {paymentStatusOptions.map((status) => (
+              <option key={status}>{status}</option>
+            ))}
+          </select>
+          <select
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value)}
+            className="border p-2 rounded"
+          >
+            <option value="">All Payment Method</option>
+            {paymentMethodOptions.map((method) => (
+              <option key={method}>{method}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
-      {/* Table View for Large Screens */}
+      {selectedOrders.length > 0 && (
+        <Button variant="destructive" onClick={handleBulkDelete}>
+          Delete Selected
+        </Button>
+      )}
+
+      {/* Desktop View */}
       <div className="hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>
+                <input
+                  type="checkbox"
+                  checked={
+                    selectedOrders.length === currentOrders.length &&
+                    currentOrders.length > 0
+                  }
+                  onChange={() =>
+                    setSelectedOrders(
+                      selectedOrders.length === currentOrders.length
+                        ? []
+                        : currentOrders.map((order) => order.order_id)
+                    )
+                  }
+                />
+              </TableHead>
               <TableHead>Order ID</TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Date</TableHead>
-              <TableHead>Amount ($)</TableHead>
+              <TableHead>Amount</TableHead>
               <TableHead>Payment</TableHead>
+              <TableHead>Method</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {orders.length > 0 ? (
-              orders.map((order) => (
-                <TableRow key={order?.order_id}>
-                  <TableCell>{order?.order_id}</TableCell>
-                  <TableCell>{order?.username}</TableCell>
+            {currentOrders.length > 0 ? (
+              currentOrders.map((order) => (
+                <TableRow key={order.order_id}>
                   <TableCell>
-                    {new Date(order?.updated_at).toLocaleDateString()}
+                    <input
+                      type="checkbox"
+                      checked={selectedOrders.includes(order.order_id)}
+                      onChange={() =>
+                        setSelectedOrders((prev) =>
+                          prev.includes(order.order_id)
+                            ? prev.filter((id) => id !== order.order_id)
+                            : [...prev, order.order_id]
+                        )
+                      }
+                    />
                   </TableCell>
-                  <TableCell>${order?.total_price}</TableCell>
+                  <TableCell>{order.order_id}</TableCell>
+                  <TableCell>{order.username}</TableCell>
+                  <TableCell>
+                    {new Date(order.updated_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>${order.total_price}</TableCell>
                   <TableCell>
                     <Badge
-                      className={`px-3 py-1 rounded-lg ${
-                        paymentStatusColors[order?.payment_status]
-                      }`}
+                      className={paymentStatusColors[order.payment_status]}
                     >
-                      {order?.payment_status?.charAt(0)?.toUpperCase() +
-                        order?.payment_status?.slice(1)}
+                      {order.payment_status}
                     </Badge>
                   </TableCell>
+                  <TableCell>{order.payment_method}</TableCell>
                   <TableCell>
-                    <Badge
-                      className={`px-3 py-1 rounded-lg ${
-                        statusColors[order.status]
-                      }`}
-                    >
-                      {order.status.charAt(0).toUpperCase() +
-                        order.status.slice(1)}
+                    <Badge className={statusColors[order.status]}>
+                      {order.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="flex flex-col gap-2">
+                    <select
+                      value={order.status}
+                      onChange={(e) =>
+                        handleStatusChange(order.order_id, e.target.value)
+                      }
+                      className="border p-1 rounded"
+                    >
+                      {orderStatusOptions.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                    {order.payment_method === "cod" && (
+                      <select
+                        value={order.payment_status}
+                        onChange={(e) =>
+                          handlePaymentStatusChange(
+                            order.order_id,
+                            e.target.value
+                          )
+                        }
+                        className="border p-1 rounded"
+                      >
+                        {paymentStatusOptions.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        router.push(`/dashboard/admin/orders/${order.order_id}`)
+                      }
+                    >
+                      View
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="text-center text-gray-500 dark:text-gray-400"
-                >
-                  No recent orders found.
+                <TableCell colSpan="9" className="text-center">
+                  No Orders Found
                 </TableCell>
               </TableRow>
             )}
@@ -117,42 +274,99 @@ export default function RecentOrders() {
         </Table>
       </div>
 
-      {/* Card View for Mobile */}
-      <div className="block md:hidden">
-        {orders.length > 0 ? (
-          orders.map((order) => (
-            <Card key={order?.order_id} className="mb-4 p-4 shadow-lg">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">
-                  Order ID: {order?.order_id}
-                </h3>
-                <Badge className={`px-3 py-1 ${statusColors[order?.status]}`}>
-                  {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4 mt-4">
+        {currentOrders.length > 0 ? (
+          currentOrders.map((order) => (
+            <Card
+              key={order.order_id}
+              className="p-4 border rounded-lg space-y-2"
+            >
+              <div className="flex justify-between">
+                <strong>Order:</strong>
+                {order.order_id}
+              </div>
+              <div>
+                <strong>Customer:</strong>
+                {order.username}
+              </div>
+              <div>
+                <strong>Date:</strong>
+                {new Date(order.updated_at).toLocaleDateString()}
+              </div>
+              <div>
+                <strong>Amount:</strong>${order.total_price}
+              </div>
+              <div>
+                <strong>Payment:</strong>
+                <Badge className={paymentStatusColors[order.payment_status]}>
+                  {order.payment_status}
                 </Badge>
               </div>
-              <p className="text-gray-500 text-sm">
-                Customer: {order?.customer}
-              </p>
-              <p className="text-gray-500 text-sm">
-                Date: {new Date(order?.date).toLocaleDateString()}
-              </p>
-              <p className="text-gray-700 font-semibold">
-                Amount: ${order?.total_price}
-              </p>
-              <Badge
-                className={`mt-2 px-3 py-1 ${
-                  paymentStatusColors[order?.payment_status]
-                }`}
-              >
-                {order?.payment_status.charAt(0).toUpperCase() +
-                  order?.payment_status.slice(1)}
-              </Badge>
+              <div>
+                <strong>Status:</strong>
+                <Badge className={statusColors[order.status]}>
+                  {order.status}
+                </Badge>
+              </div>
+              <div className="flex flex-col gap-2">
+                <select
+                  value={order.status}
+                  onChange={(e) =>
+                    handleStatusChange(order.order_id, e.target.value)
+                  }
+                  className="border p-1 rounded"
+                >
+                  {orderStatusOptions.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+                {order.payment_method === "cod" && (
+                  <select
+                    value={order.payment_status}
+                    onChange={(e) =>
+                      handlePaymentStatusChange(order.order_id, e.target.value)
+                    }
+                    className="border p-1 rounded"
+                  >
+                    {paymentStatusOptions.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    router.push(`/dashboard/admin/orders/${order.order_id}`)
+                  }
+                >
+                  View
+                </Button>
+              </div>
             </Card>
           ))
         ) : (
-          <p className="text-center text-gray-500 dark:text-gray-400">
-            No recent orders found.
-          </p>
+          <p className="text-center">No Orders Found</p>
+        )}
+      </div>
+
+      {/* Pagination */}
+      <div className="flex justify-center mt-6 gap-2">
+        {Array.from({ length: Math.ceil(orders.length / ordersPerPage) }).map(
+          (_, idx) => (
+            <Button
+              key={idx}
+              size="sm"
+              variant={currentPage === idx + 1 ? "default" : "outline"}
+              onClick={() => setCurrentPage(idx + 1)}
+            >
+              {idx + 1}
+            </Button>
+          )
         )}
       </div>
     </Card>

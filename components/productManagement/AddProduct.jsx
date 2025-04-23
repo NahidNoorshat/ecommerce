@@ -26,7 +26,7 @@ export default function ProductForm() {
     };
 
     const response = await fetch(
-      "http://127.0.0.1:8000/api/products/products/",
+      "http://13.51.157.149/api/products/products/",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

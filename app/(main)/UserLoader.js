@@ -17,7 +17,7 @@ export default function UserLoader() {
       if (accessToken && !user) {
         try {
           const response = await axios.get(
-            "http://127.0.0.1:8000/api/newauth/user/",
+            "http://13.51.157.149/api/newauth/user/",
             {
               headers: {
                 Authorization: `Bearer ${accessToken}`,

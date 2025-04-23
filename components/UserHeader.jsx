@@ -1,4 +1,5 @@
 "use client";
+
 import Link from "next/link";
 import { FiUser } from "react-icons/fi";
 import { useSelector, useDispatch } from "react-redux";
@@ -17,14 +18,16 @@ const UserHeader = () => {
   const user = useSelector((state) => state.user.user);
   const dispatch = useDispatch();
   const router = useRouter();
+
   const handleLogout = async () => {
     try {
       await logoutUser(dispatch);
-      router.push("/"); // Redirect to login page
+      router.push("/"); // Redirect after logout
     } catch (error) {
       console.error("Logout failed:", error);
     }
   };
+
   return (
     <>
       {user ? (
@@ -38,29 +41,50 @@ const UserHeader = () => {
               </div>
             </div>
           </DropdownMenuTrigger>
+
           <DropdownMenuContent>
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Billing</DropdownMenuItem>
-            {user.role === "admin" && (
-              <DropdownMenuItem>
-                <Link href="/dashboard/admin">Admin Dashboard</Link>
-              </DropdownMenuItem>
-            )}
-            {user.role === "seller" && (
-              <DropdownMenuItem>
-                <Link href="/dashboard/seller">Saler Dashboard</Link>
-              </DropdownMenuItem>
-            )}
-            {user.role === "customer" && (
-              <DropdownMenuItem>
-                <Link href="/dashboard/customer">Customer Dashboard</Link>
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem>
-              <button onClick={handleLogout}>Log Out</button>
+
+            <DropdownMenuItem onSelect={() => router.push("/customerProfile")}>
+              Profile
             </DropdownMenuItem>
+
+            <DropdownMenuItem>Billing</DropdownMenuItem>
+
+            {user.role === "admin" && (
+              <DropdownMenuItem
+                onSelect={() => router.push("/dashboard/admin")}
+              >
+                Admin Dashboard
+              </DropdownMenuItem>
+            )}
+
+            {user.role === "seller" && (
+              <DropdownMenuItem
+                onSelect={() => router.push("/dashboard/seller")}
+              >
+                Seller Dashboard
+              </DropdownMenuItem>
+            )}
+
+            {user.role === "customer" && (
+              <>
+                <DropdownMenuItem
+                  onSelect={() => router.push("/dashboard/customer")}
+                >
+                  Customer Dashboard
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onSelect={() => router.push("/register/request-seller")}
+                >
+                  Become a Seller
+                </DropdownMenuItem>
+              </>
+            )}
+
+            <DropdownMenuItem onSelect={handleLogout}>Log Out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ) : (

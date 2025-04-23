@@ -1,38 +1,63 @@
+"use client";
+
 import React, { useState } from "react";
+import { toast } from "sonner"; // Import ShadCN Toast
 
 const AddUserForm = ({ onSave, onCancel }) => {
   const [newUser, setNewUser] = useState({
     username: "",
     email: "",
-    password: "", // Password is required for creating a user
-    role: "customer", // Default role
+    password: "",
+    role: "customer",
     is_verified: false,
     is_active: true,
-    profile_picture: null, // For file upload
+    profile_picture: null,
     phone_number: "",
     address: "",
   });
 
   const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false); // Loading state for submit button
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setNewUser({ ...newUser, [name]: value });
-    // Clear the error for the field when the user starts typing
     setErrors((prevErrors) => ({ ...prevErrors, [name]: "" }));
   };
 
   const handleFileChange = (e) => {
     setNewUser({ ...newUser, profile_picture: e.target.files[0] });
-    // Clear the error for the file field when a file is selected
     setErrors((prevErrors) => ({ ...prevErrors, profile_picture: "" }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const result = await onSave(newUser); // Call API function
+    setLoading(true); // Start loading
+    try {
+      const result = await onSave(newUser); // Call API function
 
-    console.log(result, "cheking what i got at returen.. ");
+      if (result.success) {
+        toast.success("User Add success fully");
+        setNewUser({
+          // Reset form after success
+          username: "",
+          email: "",
+          password: "",
+          role: "customer",
+          is_verified: false,
+          is_active: true,
+          profile_picture: null,
+          phone_number: "",
+          address: "",
+        });
+      } else {
+        toast.error(result.message || "Failed to add user!");
+      }
+    } catch (error) {
+      toast.error("An error occurred while adding the user!");
+    } finally {
+      setLoading(false); // Stop loading
+    }
   };
 
   return (
@@ -53,9 +78,6 @@ const AddUserForm = ({ onSave, onCancel }) => {
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
             required
           />
-          {errors.username && (
-            <p className="text-red-500 text-sm mt-1">{errors.username}</p>
-          )}
         </div>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
@@ -69,9 +91,6 @@ const AddUserForm = ({ onSave, onCancel }) => {
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
             required
           />
-          {errors.email && (
-            <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-          )}
         </div>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
@@ -85,9 +104,6 @@ const AddUserForm = ({ onSave, onCancel }) => {
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
             required
           />
-          {errors.password && (
-            <p className="text-red-500 text-sm mt-1">{errors.password}</p>
-          )}
         </div>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
@@ -103,9 +119,6 @@ const AddUserForm = ({ onSave, onCancel }) => {
             <option value="customer">Customer</option>
             <option value="seller">Seller</option>
           </select>
-          {errors.role && (
-            <p className="text-red-500 text-sm mt-1">{errors.role}</p>
-          )}
         </div>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
@@ -118,9 +131,6 @@ const AddUserForm = ({ onSave, onCancel }) => {
             onChange={handleChange}
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
           />
-          {errors.phone_number && (
-            <p className="text-red-500 text-sm mt-1">{errors.phone_number}</p>
-          )}
         </div>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
@@ -132,9 +142,6 @@ const AddUserForm = ({ onSave, onCancel }) => {
             onChange={handleChange}
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
           />
-          {errors.address && (
-            <p className="text-red-500 text-sm mt-1">{errors.address}</p>
-          )}
         </div>
         <div className="mb-4">
           <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
@@ -146,15 +153,8 @@ const AddUserForm = ({ onSave, onCancel }) => {
             onChange={handleFileChange}
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
           />
-          {errors.profile_picture && (
-            <p className="text-red-500 text-sm mt-1">
-              {errors.profile_picture}
-            </p>
-          )}
         </div>
-        {errors.general && (
-          <p className="text-red-500 text-sm mb-4">{errors.general}</p>
-        )}
+
         <div className="flex justify-end gap-2">
           <button
             type="button"
@@ -165,9 +165,10 @@ const AddUserForm = ({ onSave, onCancel }) => {
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-blue-300"
+            disabled={loading}
           >
-            Save
+            {loading ? "Saving..." : "Save"}
           </button>
         </div>
       </form>

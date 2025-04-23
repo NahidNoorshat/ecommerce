@@ -27,7 +27,7 @@ const Signup = () => {
     setError(null); // Clear any previous error
     try {
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/newauth/register/",
+        "http://13.51.157.149/api/newauth/register/",
         formData
       );
       if (response.status === 201) {

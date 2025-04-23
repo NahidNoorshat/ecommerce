@@ -41,6 +41,7 @@ const Header = () => {
           {/* Cart and User Icons */}
           <div className="flex items-center space-x-4 sm:mt-0 flex-1 sm:flex-none">
             <CartIcon />
+
             {/* User icons */}
             <UserHeader />
             <Link

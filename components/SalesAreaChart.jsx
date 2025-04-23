@@ -1,4 +1,4 @@
-import React from "react";
+// SalesAreaChart.jsx
 import {
   AreaChart,
   Area,
@@ -9,21 +9,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useTheme } from "next-themes";
+const SalesAreaChart = ({ data }) => {
+  const { theme } = useTheme();
 
-const data = [
-  { name: "Page A", uv: 4000, pv: 2400, amt: 2400 },
-  { name: "Page B", uv: 3000, pv: 1398, amt: 2210 },
-  { name: "Page C", uv: 2000, pv: 9800, amt: 2290 },
-  { name: "Page D", uv: 2780, pv: 3908, amt: 2000 },
-  { name: "Page E", uv: 1890, pv: 4800, amt: 2181 },
-  { name: "Page F", uv: 2390, pv: 3800, amt: 2500 },
-  { name: "Page G", uv: 3490, pv: 4300, amt: 2100 },
-];
-
-const SalesAreaChart = () => {
-  const { theme } = useTheme(); // Get the current theme
-
-  // Define styles for light and dark modes
   const styles = {
     light: {
       background: "#fff",
@@ -41,8 +29,9 @@ const SalesAreaChart = () => {
     },
   };
 
-  // Select the appropriate styles based on the current theme
   const currentStyles = theme === "dark" ? styles.dark : styles.light;
+
+  if (!data || data.length === 0) return <p className="text-center">No data</p>;
 
   return (
     <div
@@ -68,7 +57,7 @@ const SalesAreaChart = () => {
             </linearGradient>
           </defs>
           <XAxis
-            dataKey="name"
+            dataKey="date"
             stroke={currentStyles.textColor}
             tick={{ fill: currentStyles.textColor }}
           />
@@ -91,14 +80,14 @@ const SalesAreaChart = () => {
           />
           <Area
             type="monotone"
-            dataKey="uv"
+            dataKey="sales"
             stroke="#8884d8"
             fillOpacity={1}
             fill="url(#colorUv)"
           />
           <Area
             type="monotone"
-            dataKey="pv"
+            dataKey="orders"
             stroke="#82ca9d"
             fillOpacity={1}
             fill="url(#colorPv)"

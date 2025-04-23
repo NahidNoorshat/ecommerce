@@ -27,7 +27,7 @@ const Login = () => {
     e.preventDefault();
     try {
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/newauth/login/",
+        "http://13.51.157.149/api/newauth/login/",
         formData
       );
       if (response.status === 200) {

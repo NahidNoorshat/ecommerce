@@ -8,13 +8,13 @@ export default function AddCategoryModal({ onClose, refreshData }) {
 
   useEffect(() => {
     axios
-      .get("http://127.0.0.1:8000/api/products/categories/")
+      .get("http://13.51.157.149/api/products/categories/")
       .then((res) => setCategories(res.data));
   }, []);
 
   const onSubmit = async (data) => {
     try {
-      await axios.post("http://127.0.0.1:8000/api/products/categories/", data);
+      await axios.post("http://13.51.157.149/api/products/categories/", data);
       refreshData();
       onClose();
     } catch (error) {

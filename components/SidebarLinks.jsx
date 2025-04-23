@@ -7,8 +7,9 @@ export const sidebarLinks = {
       name: "Products",
       icon: ShoppingCart,
       subLinks: [
-        { name: "Add Product", path: "/dashboard/admin/products/add" },
-        { name: "Manage Products", path: "/dashboard/admin/products/manage" },
+        { name: "All Products", path: "/dashboard/admin/product/all" },
+        { name: "Add Product", path: "/dashboard/admin/product/add" },
+        { name: "Manage Products", path: "/dashboard/admin/product/manage" },
       ],
     },
     {
@@ -25,6 +26,11 @@ export const sidebarLinks = {
       subLinks: [
         { name: "All Orders", path: "/dashboard/admin/orders/all" },
         { name: "Pending Orders", path: "/dashboard/admin/orders/pending" },
+        {
+          name: "Processing Orders",
+          path: "/dashboard/admin/orders/processing",
+        },
+        { name: "Shipped Orders", path: "/dashboard/admin/orders/shipped" },
         { name: "Completed Orders", path: "/dashboard/admin/orders/completed" },
         { name: "Cancelled Orders", path: "/dashboard/admin/orders/cancelled" },
       ],

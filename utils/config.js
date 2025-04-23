@@ -1,0 +1,7 @@
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+export const PRODUCTS_API = `${API_BASE_URL}/products`;
+export const USERS_API = `${API_BASE_URL}/users`;
+export const ORDERS_API = `${API_BASE_URL}/orders`;
+export const SHIPPIN_API = `${API_BASE_URL}/shipping`;
+export const USER_AUTH = `${API_BASE_URL}/newauth`;
+export const ANALYTICS_API = `${API_BASE_URL}/analytics`;

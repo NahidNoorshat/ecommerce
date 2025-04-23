@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import {
   BarChart,
@@ -10,26 +12,9 @@ import {
 } from "recharts";
 import { useTheme } from "next-themes";
 
-// Sample data for monthly sales
-const data = [
-  { month: "Jan", sales: 4000 },
-  { month: "Feb", sales: 3000 },
-  { month: "Mar", sales: 2000 },
-  { month: "Apr", sales: 2780 },
-  { month: "May", sales: 1890 },
-  { month: "Jun", sales: 2390 },
-  { month: "Jul", sales: 3490 },
-  { month: "Aug", sales: 4200 },
-  { month: "Sep", sales: 3800 },
-  { month: "Oct", sales: 5000 },
-  { month: "Nov", sales: 4500 },
-  { month: "Dec", sales: 6000 },
-];
+const SimpleBarChart = ({ data }) => {
+  const { theme } = useTheme();
 
-const SimpleBarChart = () => {
-  const { theme } = useTheme(); // Get the current theme
-
-  // Define styles for light and dark modes
   const styles = {
     light: {
       background: "#fff",
@@ -49,8 +34,15 @@ const SimpleBarChart = () => {
     },
   };
 
-  // Select the appropriate styles based on the current theme
   const currentStyles = theme === "dark" ? styles.dark : styles.light;
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="text-center py-10 text-gray-500 text-sm">
+        No data available to show.
+      </div>
+    );
+  }
 
   return (
     <div
@@ -69,7 +61,7 @@ const SimpleBarChart = () => {
             strokeDasharray="3 3"
             stroke={currentStyles.gridColor}
           />
-          <XAxis dataKey="month" stroke={currentStyles.textColor} />
+          <XAxis dataKey="category" stroke={currentStyles.textColor} />
           <YAxis stroke={currentStyles.textColor} />
           <Tooltip
             contentStyle={{

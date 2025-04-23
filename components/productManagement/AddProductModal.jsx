@@ -21,7 +21,7 @@ export default function AddProductModal({ onClose, refreshData }) {
 
   useEffect(() => {
     axios
-      .get("http://127.0.0.1:8000/api/products/categories/")
+      .get("http://13.51.157.149/api/products/categories/")
       .then((res) => setCategories(res.data));
   }, []);
 
@@ -46,7 +46,7 @@ export default function AddProductModal({ onClose, refreshData }) {
       }
 
       await axios.post(
-        "http://127.0.0.1:8000/api/products/products/",
+        "http://13.51.157.149/api/products/products/",
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },
