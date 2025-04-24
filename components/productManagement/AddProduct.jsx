@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
+import { PRODUCTS_API } from "@/utils/config";
+import { secureFetch } from "@/lib/api/secureFetch";
 
 const UNIT_CHOICES = [
   { value: "PCS", label: "Pieces" },
@@ -13,7 +15,7 @@ const UNIT_CHOICES = [
 ];
 
 export default function ProductForm() {
-  const { register, handleSubmit, control, watch, setValue } = useForm();
+  const { register, handleSubmit, control, watch } = useForm();
   const selectedUnit = watch("unit");
 
   const onSubmit = async (data) => {
@@ -22,17 +24,13 @@ export default function ProductForm() {
       price: data.price,
       stock: data.stock,
       unit: data.unit,
-      custom_unit: data.unit === "OTHER" ? data.custom_unit : null, // Only send if selected
+      custom_unit: data.unit === "OTHER" ? data.custom_unit : null,
     };
 
-    const response = await fetch(
-      "http://13.51.157.149/api/products/products/",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }
-    );
+    const response = await secureFetch(`${PRODUCTS_API}/products/`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
 
     if (response.ok) {
       alert("Product added successfully!");

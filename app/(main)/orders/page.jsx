@@ -1,12 +1,14 @@
 "use client";
+
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 import { Button } from "@/components/ui/button";
 import PriceFormatter from "@/components/PriceFormatter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ORDERS_API } from "@/utils/config";
+import { secureFetch } from "@/lib/api/secureFetch"; // ✅ Token refresh handler
 
 const OrdersPage = () => {
   const router = useRouter();
@@ -18,21 +20,19 @@ const OrdersPage = () => {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const token = localStorage.getItem("access");
-        if (!token) throw new Error("Please log in to view orders.");
-        const response = await axios.get(
-          "http://13.51.157.149/api/orders/orders/",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        setOrders(response.data);
+        const res = await secureFetch(`${ORDERS_API}/orders/`);
+        if (!res || !res.ok)
+          throw new Error("Unauthorized or session expired.");
+
+        const data = await res.json();
+        setOrders(data);
       } catch (err) {
-        setError(err.response?.data?.detail || err.message);
+        setError(err.message || "Failed to load orders");
       } finally {
         setLoading(false);
       }
     };
+
     fetchOrders();
   }, []);
 
@@ -101,7 +101,6 @@ const OrdersPage = () => {
                 {order.status}
               </Badge>
             </CardHeader>
-
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
               <div>
                 <p className="text-gray-500">Date</p>

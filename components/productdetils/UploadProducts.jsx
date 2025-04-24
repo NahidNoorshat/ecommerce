@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button"; // shadcn/ui Button
 import { Input } from "@/components/ui/input"; // shadcn/ui Input
 import { Label } from "@/components/ui/label"; // shadcn/ui Label
+import { PRODUCTS_API } from "@/utils/config";
 
 export default function UploadProducts() {
   const [message, setMessage] = useState("");
@@ -17,7 +18,7 @@ export default function UploadProducts() {
       formData.append("images", imageFiles[i]);
     }
 
-    const response = await fetch("http://13.51.157.149/api/products/upload/", {
+    const response = await fetch(`${PRODUCTS_API}/upload/`, {
       method: "POST",
       body: formData,
     });

@@ -6,9 +6,10 @@ import {
   getCoreRowModel,
   flexRender,
 } from "@tanstack/react-table";
-import axios from "axios";
+
 import AddProductModal from "./AddProductModal";
 import AddCategoryModal from "./AddCategoryModal";
+import { PRODUCTS_API } from "@/utils/config";
 
 export default function ProductTable() {
   const [products, setProducts] = useState([]);
@@ -21,9 +22,7 @@ export default function ProductTable() {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get(
-        "http://13.51.157.149/api/products/products/"
-      );
+      const response = await secureAxios.get(`${PRODUCTS_API}/products/`);
       setProducts(response.data);
       console.log(response.data);
     } catch (error) {

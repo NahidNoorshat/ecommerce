@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
+import secureAxios from "@/lib/api/secureAxios";
+import { PRODUCTS_API } from "@/utils/config";
 import axios from "axios";
 
 const UNIT_CHOICES = [
@@ -20,8 +22,8 @@ export default function AddProductModal({ onClose, refreshData }) {
   const [imagePreview, setImagePreview] = useState(null);
 
   useEffect(() => {
-    axios
-      .get("http://13.51.157.149/api/products/categories/")
+    secureAxios
+      .get(`${PRODUCTS_API}/categories/`)
       .then((res) => setCategories(res.data));
   }, []);
 
@@ -45,13 +47,9 @@ export default function AddProductModal({ onClose, refreshData }) {
         formData.append("image", data.image[0]); // Attach the image file
       }
 
-      await axios.post(
-        "http://13.51.157.149/api/products/products/",
-        formData,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-        }
-      );
+      await axios.post(`${PRODUCTS_API}/products/`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       refreshData();
       onClose();

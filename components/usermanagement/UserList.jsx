@@ -6,6 +6,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { useUserManagement } from "@/hooks/useUserManagement";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import secureAxios from "@/lib/api/secureAxios";
 
 import DefaultAvatar from "../../public/useradmin.jpg";
 import Image from "next/image";
@@ -28,34 +29,17 @@ export default function UserTable() {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
 
     try {
-      const token = localStorage.getItem("access");
+      const response = await secureAxios.delete(`/users/users/${id}/`);
 
-      if (!token) {
-        alert("Unauthorized: No token found.");
-        return;
+      if (response.status === 204) {
+        setUsers(users.filter((user) => user.id !== id));
+        toast.success("User deleted successfully");
+      } else {
+        throw new Error("Failed to delete user");
       }
-
-      const response = await fetch(
-        `http://13.51.157.149/api/users/users/${id}/`,
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to delete user.");
-      }
-
-      setUsers(users.filter((user) => user.id !== id));
-      toast.success("User deleted successfully");
     } catch (error) {
       console.error("Error deleting user:", error.message);
-      alert(`Error: ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     }
   };
 

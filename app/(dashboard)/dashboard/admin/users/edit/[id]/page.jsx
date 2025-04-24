@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Loader from "@/components/Loader";
+import { USERS_API } from "@/utils/config";
 
 export default function EditUserPage() {
   const { id } = useParams();
@@ -32,16 +33,13 @@ export default function EditUserPage() {
 
       try {
         const token = localStorage.getItem("access");
-        const response = await fetch(
-          `http://13.51.157.149/api/users/users/${id}/`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const response = await fetch(`${USERS_API}/users/${id}/`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (!response.ok) throw new Error("Failed to fetch user data");
 
@@ -94,16 +92,13 @@ export default function EditUserPage() {
         formData.append("profile_picture", profilePicture);
       }
 
-      const response = await fetch(
-        `http://13.51.157.149/api/users/users/${id}/`,
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData, // Send FormData for mixed data types
-        }
-      );
+      const response = await fetch(`${USERS_API}/users/${id}/`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData, // Send FormData for mixed data types
+      });
 
       if (!response.ok) {
         const data = await response.json();

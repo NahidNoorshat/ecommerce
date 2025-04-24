@@ -1,6 +1,8 @@
+"use client";
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import axios from "axios";
+import { PRODUCTS_API } from "@/utils/config"; // ✅ use centralized endpoint
 
 export default function AddCategoryModal({ onClose, refreshData }) {
   const { register, handleSubmit, reset } = useForm();
@@ -8,13 +10,13 @@ export default function AddCategoryModal({ onClose, refreshData }) {
 
   useEffect(() => {
     axios
-      .get("http://13.51.157.149/api/products/categories/")
+      .get(`${PRODUCTS_API}/categories/`)
       .then((res) => setCategories(res.data));
   }, []);
 
   const onSubmit = async (data) => {
     try {
-      await axios.post("http://13.51.157.149/api/products/categories/", data);
+      await axios.post(`${PRODUCTS_API}/categories/`, data);
       refreshData();
       onClose();
     } catch (error) {

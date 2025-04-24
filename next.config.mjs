@@ -3,9 +3,8 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: "http",
-        hostname: "13.51.157.149",
-        port: "8000",
+        protocol: "https",
+        hostname: "api.hairin.xyz",
         pathname: "/media/**",
       },
     ],
