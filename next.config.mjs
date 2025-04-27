@@ -7,6 +7,18 @@ const nextConfig = {
         hostname: "api.hairin.xyz",
         pathname: "/media/**",
       },
+      {
+        protocol: "http",
+        hostname: "localhost",
+        port: "8000", // optional, only needed if you're not proxying
+        pathname: "/media/**",
+      },
+      {
+        protocol: "http",
+        hostname: "127.0.0.1",
+        port: "8000",
+        pathname: "/media/**",
+      },
     ],
   },
 };

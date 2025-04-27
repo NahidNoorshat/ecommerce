@@ -5,3 +5,4 @@ export const ORDERS_API = `${API_BASE_URL}/orders`;
 export const SHIPPIN_API = `${API_BASE_URL}/shipping`;
 export const USER_AUTH = `${API_BASE_URL}/newauth`;
 export const ANALYTICS_API = `${API_BASE_URL}/analytics`;
+export const BANNER_API = `${API_BASE_URL}/banners`;
