@@ -75,6 +75,11 @@ const AddToCartButton = React.memo(({ product, className }) => {
       return;
     }
 
+    if (product.has_variants && !selectedVariant) {
+      toast.warning("Please select all options before adding to cart.");
+      return;
+    }
+
     const token = localStorage.getItem("access");
     if (!token) {
       toast.error("Please log in to add items to your cart");
@@ -86,6 +91,7 @@ const AddToCartButton = React.memo(({ product, className }) => {
     if (product.has_variants && selectedVariant?.id) {
       payload.variantId = selectedVariant.id;
     }
+
     try {
       await dispatch(addToCart(payload)).unwrap();
       toast.success(

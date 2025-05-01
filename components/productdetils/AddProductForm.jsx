@@ -16,7 +16,6 @@ const initialProductData = {
   custom_unit: "",
   label: "",
   status: "NEW",
-  image: null,
   has_variants: false,
   variants: [],
 };
@@ -40,10 +39,14 @@ const VariantForm = ({
           );
           return (
             <div key={attr.id}>
-              <label className="block text-sm font-medium mb-2">
+              <label
+                htmlFor={`variant-${attr.id}-${index}`}
+                className="block text-sm font-medium mb-2"
+              >
                 {attr.name}
               </label>
               <select
+                id={`variant-${attr.id}-${index}`}
                 name={attr.name}
                 value={
                   variant.attributes.find((a) =>
@@ -74,9 +77,15 @@ const VariantForm = ({
           );
         })}
         <div>
-          <label className="block text-sm font-medium mb-2">Price</label>
+          <label
+            htmlFor={`variant-price-${index}`}
+            className="block text-sm font-medium mb-2"
+          >
+            Price
+          </label>
           <input
             type="number"
+            id={`variant-price-${index}`}
             name="price"
             value={variant.price}
             onChange={(e) => onChange(index, e)}
@@ -87,9 +96,15 @@ const VariantForm = ({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2">Stock</label>
+          <label
+            htmlFor={`variant-stock-${index}`}
+            className="block text-sm font-medium mb-2"
+          >
+            Stock
+          </label>
           <input
             type="number"
+            id={`variant-stock-${index}`}
             name="stock"
             value={variant.stock}
             onChange={(e) => onChange(index, e)}
@@ -99,9 +114,15 @@ const VariantForm = ({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2">Image</label>
+          <label
+            htmlFor={`variant-image-${index}`}
+            className="block text-sm font-medium mb-2"
+          >
+            Image
+          </label>
           <input
             type="file"
+            id={`variant-image-${index}`}
             name="image"
             accept="image/*"
             onChange={(e) => onChange(index, e)}
@@ -129,7 +150,9 @@ const VariantForm = ({
 
 export default function AddProductForm() {
   const [productData, setProductData] = useState(initialProductData);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [uploadedImages, setUploadedImages] = useState([]);
+  const [uploadedImagePreviews, setUploadedImagePreviews] = useState([]);
+  const [mainImageIndex, setMainImageIndex] = useState(0);
   const [variantPreviews, setVariantPreviews] = useState([]);
   const [categories, setCategories] = useState([]);
   const [variantAttributes, setVariantAttributes] = useState([]);
@@ -145,10 +168,6 @@ export default function AddProductForm() {
           axios.get(`${PRODUCTS_API}/variant-attributes/`),
           axios.get(`${PRODUCTS_API}/variant-attribute-values/`),
         ]);
-        console.log("Categories:", categoriesRes.data);
-        console.log("Attributes:", attributesRes.data);
-
-        console.log("Attribute Values:", valuesRes.data); // Check IDs here
         setCategories(categoriesRes.data);
         setVariantAttributes(attributesRes.data);
         setVariantAttributeValues(valuesRes.data);
@@ -161,6 +180,36 @@ export default function AddProductForm() {
     };
     fetchData();
   }, []);
+
+  // Clean up object URLs on unmount or image change
+  useEffect(() => {
+    return () => {
+      uploadedImagePreviews.forEach((preview) => URL.revokeObjectURL(preview));
+      variantPreviews.forEach((preview) => URL.revokeObjectURL(preview));
+    };
+  }, [uploadedImagePreviews, variantPreviews]);
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    const validFiles = files.filter((file) => {
+      if (!file.type.startsWith("image/")) {
+        toast.error(`${file.name} is not an image.`);
+        return false;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name} exceeds 5MB.`);
+        return false;
+      }
+      return true;
+    });
+
+    // Clean up previous previews
+    uploadedImagePreviews.forEach((preview) => URL.revokeObjectURL(preview));
+    setUploadedImages(validFiles);
+    const previews = validFiles.map((file) => URL.createObjectURL(file));
+    setUploadedImagePreviews(previews);
+    setMainImageIndex(0); // Default to first image as main
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -176,6 +225,13 @@ export default function AddProductForm() {
     const updatedVariants = [...productData.variants];
 
     if (name === "image" && files && files[0]) {
+      if (
+        !files[0].type.startsWith("image/") ||
+        files[0].size > 5 * 1024 * 1024
+      ) {
+        toast.error("Please upload a valid image (max 5MB).");
+        return;
+      }
       updatedVariants[index][name] = files[0];
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -187,7 +243,7 @@ export default function AddProductForm() {
       };
       reader.readAsDataURL(files[0]);
     } else if (name === "attributes") {
-      updatedVariants[index].attributes = value; // Array of IDs
+      updatedVariants[index].attributes = value;
     } else {
       updatedVariants[index][name] =
         name === "stock" ? parseInt(value, 10) || "" : value;
@@ -211,22 +267,6 @@ export default function AddProductForm() {
     const updatedPreviews = variantPreviews.filter((_, i) => i !== index);
     setProductData((prev) => ({ ...prev, variants: updatedVariants }));
     setVariantPreviews(updatedPreviews);
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (
-      file &&
-      file.type.startsWith("image/") &&
-      file.size <= 5 * 1024 * 1024
-    ) {
-      setProductData((prev) => ({ ...prev, image: file }));
-      const reader = new FileReader();
-      reader.onloadend = () => setImagePreview(reader.result);
-      reader.readAsDataURL(file);
-    } else {
-      toast.error("Please upload a valid image file (max 5MB).");
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -274,7 +314,6 @@ export default function AddProductForm() {
     }
 
     const formData = new FormData();
-    // Append top-level fields as raw entries
     formData.append("name", productData.name);
     formData.append("description", productData.description);
     formData.append("category", productData.category);
@@ -293,9 +332,9 @@ export default function AddProductForm() {
       formData.append("stock", productData.stock.toString());
     }
 
-    if (productData.image) {
-      formData.append("image", productData.image);
-    }
+    // Append multiple images
+    uploadedImages.forEach((img) => formData.append("uploaded_images", img));
+    formData.append("main_image_index", mainImageIndex.toString());
 
     if (productData.has_variants && productData.variants.length > 0) {
       const variantsData = productData.variants.map((variant) => ({
@@ -321,7 +360,9 @@ export default function AddProductForm() {
       console.log("Response:", response.data);
       toast.success("Product added successfully!");
       setProductData(initialProductData);
-      setImagePreview(null);
+      setUploadedImages([]);
+      setUploadedImagePreviews([]);
+      setMainImageIndex(0);
       setVariantPreviews([]);
     } catch (error) {
       console.error("Error:", error);
@@ -335,6 +376,7 @@ export default function AddProductForm() {
       setIsSubmitting(false);
     }
   };
+
   if (isLoading) {
     return <div className="text-center p-4">Loading...</div>;
   }
@@ -543,6 +585,43 @@ export default function AddProductForm() {
               </span>
             </label>
           </div>
+          <div className="mb-4">
+            <label
+              htmlFor="uploaded_images"
+              className="block text-sm font-medium mb-2"
+            >
+              Product Images (Select multiple)
+            </label>
+            <input
+              type="file"
+              id="uploaded_images"
+              name="uploaded_images"
+              accept="image/*"
+              multiple
+              onChange={handleFileChange}
+              className="w-full p-3 bg-white dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600"
+            />
+            <div className="flex flex-wrap gap-4 mt-4">
+              {uploadedImagePreviews.map((preview, index) => (
+                <div key={index} className="relative">
+                  <img
+                    src={preview}
+                    alt={`Preview ${index + 1}`}
+                    className={`w-24 h-24 object-cover rounded ${
+                      index === mainImageIndex ? "border-4 border-blue-500" : ""
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMainImageIndex(index)}
+                    className="absolute top-0 right-0 bg-blue-600 text-white text-xs px-1 py-0.5 rounded-bl-lg"
+                  >
+                    {index === mainImageIndex ? "Main" : "Set Main"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
           {productData.has_variants && (
             <div className="mb-6">
               <h3 className="text-lg font-semibold mb-4">Product Variants</h3>
@@ -567,26 +646,6 @@ export default function AddProductForm() {
               </button>
             </div>
           )}
-          <div className="mb-4">
-            <label htmlFor="image" className="block text-sm font-medium mb-2">
-              Product Image
-            </label>
-            <input
-              type="file"
-              id="image"
-              name="image"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="w-full p-3 bg-white dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600"
-            />
-            {imagePreview && (
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="mt-2 w-32 h-32 object-cover rounded"
-              />
-            )}
-          </div>
           <button
             type="submit"
             disabled={isSubmitting}

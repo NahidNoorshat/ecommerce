@@ -90,14 +90,14 @@ const DiscountBanner = () => {
                     )}
                     <Button>Shop Now</Button>
                   </div>
-                  <div className="w-full md:w-1/2 h-auto relative flex items-center justify-center py-2">
+                  {/* Right image part */}
+                  <div className="relative w-full md:w-1/2 aspect-[4/3] overflow-hidden">
                     <Image
-                      src={banner.image} // ✅ Use image directly since it's already a full URL
+                      src={banner.image}
                       alt={banner.title}
-                      width={500}
-                      height={500}
+                      fill
                       priority
-                      className="h-full object-cover transition-transform duration-300 ease-in-out hover:scale-105"
+                      className="object-cover hover:scale-105 transition-transform duration-500 ease-in-out"
                     />
                   </div>
                 </div>

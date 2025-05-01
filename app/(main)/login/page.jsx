@@ -12,6 +12,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const dispatch = useDispatch();
+  const [errors, setErrors] = useState({ username: "", password: "" });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -30,24 +31,52 @@ const Login = () => {
 
       const data = await response.json();
 
-      if (!response.ok) throw new Error(data.detail || "Login failed");
+      if (!response.ok) {
+        if (data.username || data.password) {
+          setErrors({
+            username: data.username?.[0] || "",
+            password: data.password?.[0] || "",
+          });
+        } else if (
+          data.detail === "No active account found with the given credentials"
+        ) {
+          setErrors({
+            username: "Invalid username or password.",
+            password: "Invalid username or password.",
+          });
+        } else {
+          toast.error(data.detail || "Login failed");
+        }
+        return;
+      }
 
-      // Store tokens
+      const profilePicture = data.profile_picture
+        ? data.profile_picture.replace(/^\/api\/newauth/, "")
+        : null;
+
+      const userData = {
+        username: data.username || "Guest",
+        role: data.role || "unknown",
+        profile_picture: profilePicture,
+      };
+
       localStorage.setItem("access", data.access);
       localStorage.setItem("refresh", data.refresh);
 
-      // Set user in Redux
-      dispatch(
-        setUser({
-          username: data.username,
-          email: data.email,
-          role: data.role,
-        })
-      );
+      // ✅ No manual localStorage.setItem("user") here
+      dispatch(setUser(userData));
 
       toast.success("Login successful!");
-      router.push("/");
+
+      if (data.role === "admin") {
+        router.push("/dashboard/admin");
+      } else if (data.role === "customer") {
+        router.push("/");
+      } else {
+        router.push("/");
+      }
     } catch (err) {
+      console.error("Login error:", err);
       toast.error(err.message || "Invalid credentials");
     } finally {
       setLoading(false);
@@ -75,6 +104,9 @@ const Login = () => {
               required
               className="w-full p-3 mt-2 border border-gray-300 rounded-md"
             />
+            {errors.username && (
+              <p className="text-red-500 text-sm mt-1">{errors.username}</p>
+            )}
           </div>
 
           <div>
@@ -93,6 +125,9 @@ const Login = () => {
               required
               className="w-full p-3 mt-2 border border-gray-300 rounded-md"
             />
+            {errors.password && (
+              <p className="text-red-500 text-sm mt-1">{errors.password}</p>
+            )}
           </div>
 
           <button

@@ -10,7 +10,7 @@ const nextConfig = {
       {
         protocol: "http",
         hostname: "localhost",
-        port: "8000", // optional, only needed if you're not proxying
+        port: "8000",
         pathname: "/media/**",
       },
       {

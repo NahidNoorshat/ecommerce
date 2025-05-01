@@ -8,32 +8,35 @@ import axios from "axios";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import React, { useState, useEffect } from "react";
-import { FaRegQuestionCircle } from "react-icons/fa";
-import { FiShare2 } from "react-icons/fi";
 import { LuStar } from "react-icons/lu";
-import { RxBorderSplit } from "react-icons/rx";
-import { TbTruckDelivery } from "react-icons/tb";
+import { toast } from "sonner";
 
 const ProductPage = ({ params: paramsPromise }) => {
   const [product, setProduct] = useState(null);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [selectedAttributes, setSelectedAttributes] = useState({});
+  const [selectedImage, setSelectedImage] = useState(null);
   const [error, setError] = useState(null);
   const [attributesMap, setAttributesMap] = useState({});
-
   const params = React.use(paramsPromise);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [productsRes, attributesRes] = await Promise.all([
-          axios.get(`${PRODUCTS_API}/products/`),
+        const [productRes, attributesRes] = await Promise.all([
+          axios.get(`${PRODUCTS_API}/products/${params.slug}/`), // Changed to detail endpoint
           axios.get(`${PRODUCTS_API}/variant-attributes/`),
         ]);
-        const products = productsRes.data;
-        const foundProduct = products.find((p) => p.slug === params.slug);
-        if (!foundProduct) notFound();
 
+        console.log("Product response:", productRes.data);
+
+        const foundProduct = productRes.data;
+        if (!foundProduct?.slug) {
+          console.warn(`No product found for slug: ${params.slug}`);
+          notFound();
+        }
+
+        // Map attributes
         const attrMap = {};
         attributesRes.data.forEach((attr) => {
           attrMap[attr.id] = attr.name;
@@ -41,38 +44,42 @@ const ProductPage = ({ params: paramsPromise }) => {
         setAttributesMap(attrMap);
 
         setProduct(foundProduct);
-        if (foundProduct.has_variants && foundProduct.variants.length > 0) {
-          setSelectedVariant(foundProduct.variants[0]);
-          const initialAttributes = {};
-          foundProduct.variants[0].attributes.forEach((attr) => {
-            initialAttributes[attr.attribute] = attr.value;
-          });
-          setSelectedAttributes(initialAttributes);
-        }
+
+        // No auto-selection of default variant
       } catch (err) {
         console.error("Error fetching data:", err);
-        setError("Failed to load products");
+        if (err.response?.status === 404) {
+          notFound();
+        }
+        setError("Failed to load product");
       }
     };
+
     fetchData();
   }, [params.slug]);
 
-  if (!product && !error) return <div>Loading...</div>;
+  if (!product && !error) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="w-12 h-12 border-4 border-gray-300 border-t-black rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   if (error) return <div>{error}</div>;
 
   const variants = product.variants || [];
-  const allImages = product.has_variants
-    ? variants
-    : [
-        {
-          id: "main",
-          image: product.image,
-          color: "Default",
-          size: "",
-          price: product.price,
-          stock: product.stock,
-        },
-      ];
+
+  const allImages = [
+    ...(product.main_image ? [product.main_image] : []),
+    ...(product.gallery_images || []),
+    ...(product.has_variants
+      ? variants.map((v, i) => ({ ...v, id: `variant-${i}` }))
+      : []),
+  ].filter((item) => item && item.image);
+
+  console.log("All images:", allImages);
+  console.log("Variants:", variants);
 
   const getVariantAttributes = () => {
     const attributeMap = {};
@@ -89,77 +96,90 @@ const ProductPage = ({ params: paramsPromise }) => {
     return attributeMap;
   };
 
+  const findMatchingVariant = (selectedAttrs) => {
+    return variants.find((variant) =>
+      variant.attributes.every(
+        (attr) => selectedAttrs[attr.attribute] === attr.value
+      )
+    );
+  };
+
   const variantAttributes = getVariantAttributes();
+  console.log("Variant attributes:", variantAttributes);
 
   const handleAttributeChange = (attribute, value) => {
     const newAttributes = { ...selectedAttributes, [attribute]: value };
     setSelectedAttributes(newAttributes);
 
-    const newVariant = variants.find((v) =>
-      v.attributes.every((a) => newAttributes[a.attribute] === a.value)
-    );
-    setSelectedVariant(newVariant || variants[0]);
+    const newVariant = findMatchingVariant(newAttributes);
+    if (newVariant) {
+      setSelectedVariant(newVariant);
+      if (newVariant.image) {
+        setSelectedImage(newVariant.image);
+      }
+    } else {
+      setSelectedVariant(null);
+      setSelectedImage(null);
+    }
   };
 
-  const stockQuantity = selectedVariant?.stock ?? product?.stock ?? 0; // Use nullish coalescing to handle undefined/null
+  const stockQuantity = selectedVariant?.stock ?? product?.stock ?? 0;
 
   return (
     <div>
       <Container className="flex flex-col md:flex-row gap-10 py-10">
+        {/* Product Image */}
         <div className="w-full md:w-1/2 flex flex-col gap-4">
-          <div className="w-full h-auto border border-darkBlue/20 shadow-md rounded-md group overflow-hidden aspect-square">
+          <div className="w-full aspect-[4/5] bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden relative shadow-sm">
             <Image
-              src={selectedVariant?.image || product.image}
+              src={
+                selectedImage ||
+                selectedVariant?.image ||
+                product.main_image?.image ||
+                "/fallback-image.jpg"
+              }
               alt={product.name}
-              width={700}
-              height={700}
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
               priority
-              className="w-full h-full object-contain group-hover:scale-105 hoverEffect rounded-md"
+              className="object-contain p-2"
             />
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-2">
-            {allImages.map(
-              (item) =>
-                item.image && (
-                  <div
-                    key={item.id}
-                    onClick={() =>
-                      setSelectedVariant(product.has_variants ? item : null)
-                    }
-                    className={`flex-shrink-0 w-20 h-20 border rounded-md overflow-hidden hover:border-darkBlue hoverEffect cursor-pointer ${
-                      selectedVariant?.id === item.id ||
-                      (!selectedVariant &&
-                        item.id === "main" &&
-                        !product.has_variants)
-                        ? "border-darkBlue"
-                        : "border-darkBlue/20"
-                    }`}
-                  >
-                    <Image
-                      src={item.image}
-                      alt={`${product.name} - ${item.color || ""} ${
-                        item.size || ""
-                      }`}
-                      width={80}
-                      height={80}
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                )
-            )}
+            {allImages.map((item, idx) => (
+              <div
+                key={item.id || `image-${idx}`}
+                onClick={() => setSelectedImage(item.image)}
+                className={`flex-shrink-0 w-20 h-20 border-2 rounded-md overflow-hidden cursor-pointer transition-all ${
+                  selectedImage === item.image
+                    ? "border-2 border-black"
+                    : "border border-gray-300 hover:border-black"
+                }`}
+              >
+                <Image
+                  src={item.image}
+                  alt={`${product.name}`}
+                  width={80}
+                  height={80}
+                  sizes="80px"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ))}
           </div>
         </div>
 
+        {/* Product Details */}
         <div className="w-full md:w-1/2 flex flex-col gap-5">
           <div>
             <p className="text-4xl font-bold mb-2">{product?.name}</p>
             <div className="flex items-center gap-2">
-              <div className="text-lightText flex items-center gap-.5 text-sm">
+              <div className="text-lightText flex items-center gap-0.5 text-sm">
                 {Array.from({ length: 5 }).map((_, index) => (
                   <LuStar
-                    fill={index < 4 ? "#fca99b" : "transparent"}
                     key={index}
+                    fill={index < 4 ? "#fca99b" : "transparent"}
                     className={index < 4 ? "text-lightOrange" : "text-gray-500"}
                   />
                 ))}
@@ -188,97 +208,74 @@ const ProductPage = ({ params: paramsPromise }) => {
             </p>
           )}
 
-          <p className="text-base text-gray-800">
-            <span className="bg-black text-white px-3 py-1 text-sm font-semibold rounded-md mr-2">
-              20
-            </span>
-            People are viewing this right now
-          </p>
-
           <p className="text-sm text-gray-600 tracking-wide">
             {product?.description}
           </p>
 
+          {/* Variant Selection */}
           {product.has_variants && variants.length > 0 && (
-            <div className="flex flex-col gap-4">
-              <p className="text-base font-semibold">Select Variant:</p>
+            <div className="flex flex-col gap-4 mt-6">
+              <p className="text-lg font-semibold">Select Variant:</p>
+
               {Object.entries(variantAttributes).map(
                 ([attributeId, values]) => (
                   <div key={attributeId} className="flex flex-col gap-2">
-                    <label className="text-sm font-medium">
+                    <p className="text-sm font-medium text-gray-700">
                       {attributesMap[attributeId] || attributeId}:
-                    </label>
-                    <select
-                      value={selectedAttributes[attributeId] || ""}
-                      onChange={(e) =>
-                        handleAttributeChange(attributeId, e.target.value)
-                      }
-                      className="border border-darkBlue/20 rounded-md p-2 hover:border-darkBlue focus:outline-none focus:ring-2 focus:ring-darkBlue"
-                    >
-                      <option value="">
-                        Select {attributesMap[attributeId] || attributeId}
-                      </option>
+                    </p>
+
+                    <div className="flex flex-wrap gap-2">
                       {Array.from(values).map((value) => {
-                        const variant = variants.find((v) =>
-                          v.attributes.some(
-                            (a) =>
-                              a.attribute === Number(attributeId) &&
-                              a.value === value
-                          )
-                        );
-                        const inStock = variant && variant.stock > 0;
+                        const isSelected =
+                          selectedAttributes[attributeId] === value;
+
                         return (
-                          <option key={value} value={value} disabled={!inStock}>
-                            {value} {inStock ? "" : "(Out of Stock)"}
-                          </option>
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() =>
+                              handleAttributeChange(attributeId, value)
+                            }
+                            className={`px-4 py-2 rounded-md border text-sm font-medium transition-all duration-200 ${
+                              isSelected
+                                ? "bg-black text-white border-black"
+                                : "bg-white text-black border-gray-300 hover:border-black"
+                            }`}
+                          >
+                            {value}
+                          </button>
                         );
                       })}
-                    </select>
+                    </div>
                   </div>
                 )
               )}
             </div>
           )}
 
-          <AddToCartButton product={{ ...product, selectedVariant }} />
-
-          <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-b-gray-200 py-5 -mt-2">
-            <div className="flex items-center gap-2 text-sm text-black hover:text-red-600 hoverEffect">
-              <RxBorderSplit className="text-lg" />
-              <p>Compare color</p>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-black hover:text-red-600 hoverEffect">
-              <FaRegQuestionCircle className="text-lg" />
-              <p>Ask a question</p>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-black hover:text-red-600 hoverEffect">
-              <TbTruckDelivery className="text-lg" />
-              <p>Delivery & Return</p>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-black hover:text-red-600 hoverEffect">
-              <FiShare2 className="text-lg" />
-              <p>Share</p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-5">
-            <div className="border border-darkBlue/20 text-center p-3 hover:border-darkBlue hoverEffect rounded-md">
-              <p className="text-base font-semibold text-black">
-                Free Shipping
-              </p>
-              <p className="text-sm text-gray-500">
-                Free shipping over order $120
-              </p>
-            </div>
-            <div className="border border-darkBlue/20 text-center p-3 hover:border-darkBlue hoverEffect rounded-md">
-              <p className="text-base font-semibold text-black">
-                Flexible Payment
-              </p>
-              <p className="text-sm text-gray-500">
-                Pay with Multiple Credit Cards
-              </p>
-            </div>
-          </div>
+          {/* Add to Cart Section */}
+          {product.has_variants ? (
+            selectedVariant ? (
+              <AddToCartButton product={{ ...product, selectedVariant }} />
+            ) : (
+              <div className="flex flex-col gap-2 mt-4">
+                <button
+                  type="button"
+                  disabled
+                  onClick={() =>
+                    toast.error(
+                      "Combination not available. Please change options."
+                    )
+                  }
+                  className="w-full px-4 py-2 rounded-md bg-gray-300 text-gray-600 cursor-not-allowed"
+                >
+                  Select correct variant first
+                </button>
+              </div>
+            )
+          ) : (
+            <AddToCartButton product={product} />
+          )}
         </div>
       </Container>
     </div>

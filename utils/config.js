@@ -6,3 +6,4 @@ export const SHIPPIN_API = `${API_BASE_URL}/shipping`;
 export const USER_AUTH = `${API_BASE_URL}/newauth`;
 export const ANALYTICS_API = `${API_BASE_URL}/analytics`;
 export const BANNER_API = `${API_BASE_URL}/banners`;
+export const CATEGORIES_API = `${PRODUCTS_API}/categories`;

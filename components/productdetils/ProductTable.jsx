@@ -24,6 +24,7 @@ import ProductSkeletonRow from "../lazyloading/ProductSkeletonRow";
 export default function ProductTable() {
   const [products, setProducts] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -31,11 +32,10 @@ export default function ProductTable() {
   const [expandedRows, setExpandedRows] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [deletingId, setDeletingId] = useState(null);
-  const productsPerPage = 10;
-  const [sortKey, setSortKey] = useState(null); // 'stock' or 'price'
+  const productsPerPage = 20; // Adjust based on backend default (e.g., 20 items per page)
+  const [sortKey, setSortKey] = useState(null); // e.g., 'price' or 'stock'
   const [sortOrder, setSortOrder] = useState("asc"); // 'asc' or 'desc'
   const [stockFilter, setStockFilter] = useState("all"); // 'all', 'low', 'out'
-
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categories, setCategories] = useState([]);
@@ -44,21 +44,37 @@ export default function ProductTable() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${PRODUCTS_API}/products`);
+      // Construct query parameters
+      const queryParams = new URLSearchParams({
+        page: currentPage,
+        per_page: productsPerPage, // Use 'per_page' or 'limit' based on backend
+        search: searchTerm || "",
+        category: categoryFilter !== "all" ? categoryFilter : "",
+        status: statusFilter !== "all" ? statusFilter.toUpperCase() : "", // Backend expects uppercase (e.g., 'SALE', 'NEW')
+        stock: stockFilter !== "all" ? stockFilter : "",
+        ordering: sortKey
+          ? sortOrder === "asc"
+            ? sortKey
+            : `-${sortKey}`
+          : "",
+      }).toString();
+
+      const res = await fetch(`${PRODUCTS_API}/products/?${queryParams}`);
       if (!res.ok) throw new Error("Failed to fetch products");
       const data = await res.json();
-      setProducts(data);
+      setProducts(data.results || []);
+      setTotalPages(data.total_pages || 1);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
+
   const fetchCategories = async () => {
     try {
       const res = await fetch(`${PRODUCTS_API}/categories/`);
       const data = await res.json();
-      console.log(data, "the cetegory i fetch ***************");
       setCategories(data);
     } catch (err) {
       console.error("Failed to fetch categories", err);
@@ -68,7 +84,34 @@ export default function ProductTable() {
   useEffect(() => {
     fetchProducts();
     fetchCategories();
-  }, []);
+  }, [
+    currentPage,
+    searchTerm,
+    stockFilter,
+    categoryFilter,
+    statusFilter,
+    sortKey,
+    sortOrder,
+  ]);
+
+  // Reset to page 1 if filters change to avoid invalid page
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    searchTerm,
+    stockFilter,
+    categoryFilter,
+    statusFilter,
+    sortKey,
+    sortOrder,
+  ]);
+
+  // Handle invalid page
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this product?"))
@@ -79,8 +122,8 @@ export default function ProductTable() {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed to delete product");
-      setProducts(products.filter((product) => product.id !== id));
       toast.success("Product deleted successfully!");
+      await fetchProducts();
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -106,16 +149,13 @@ export default function ProductTable() {
   const handleBulkDelete = async () => {
     if (!window.confirm("Are you sure you want to delete selected products?"))
       return;
-
     try {
       const res = await fetch(`${PRODUCTS_API}/bulk-delete/`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: selectedProductIds }),
       });
-
       if (!res.ok) throw new Error("Bulk delete failed");
-
       toast.success("Selected products deleted!");
       setSelectedProductIds([]);
       await fetchProducts();
@@ -124,47 +164,7 @@ export default function ProductTable() {
     }
   };
 
-  const filteredProducts = products
-    // 🔍 Search
-    .filter((product) =>
-      product.name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-
-    // 📦 Stock filter
-    .filter((product) => {
-      if (stockFilter === "low")
-        return product.stock > 0 && product.stock <= 10;
-      if (stockFilter === "out") return product.stock === 0;
-      return true;
-    })
-
-    // 🏷️ Category filter
-    .filter((product) => {
-      if (categoryFilter === "all") return true;
-      return product.category?.id === parseInt(categoryFilter);
-    })
-
-    // 🚩 Status filter
-    .filter((product) => {
-      if (statusFilter === "all") return true;
-      return product.status?.toLowerCase() === statusFilter;
-    })
-
-    // 🔃 Sorting
-    .sort((a, b) => {
-      if (!sortKey) return 0;
-      const aValue = a[sortKey];
-      const bValue = b[sortKey];
-      return sortOrder === "asc" ? aValue - bValue : bValue - aValue;
-    });
-
-  const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
-  const indexOfLastProduct = currentPage * productsPerPage;
-  const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
-  const currentProducts = filteredProducts.slice(
-    indexOfFirstProduct,
-    indexOfLastProduct
-  );
+  const currentProducts = products;
 
   if (loading) {
     return (
@@ -178,8 +178,6 @@ export default function ProductTable() {
             </TableBody>
           </Table>
         </div>
-
-        {/* Skeletons for mobile cards */}
         <div className="block md:hidden space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
             <div
@@ -197,7 +195,7 @@ export default function ProductTable() {
   }
 
   if (error) return <p className="text-red-500">{error}</p>;
-  if (!loading && !error && filteredProducts.length === 0) {
+  if (!loading && !error && currentProducts.length === 0) {
     return (
       <Card className="p-4 text-center space-y-4">
         <p className="text-gray-500">No products matched your filters.</p>
@@ -222,20 +220,13 @@ export default function ProductTable() {
   return (
     <Card className="p-4">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-4">
-        {/* Left: Search + Filters */}
         <div className="flex flex-wrap gap-2">
-          {/* Search */}
           <Input
             placeholder="Search products by name..."
             value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-sm"
           />
-
-          {/* Category Filter */}
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
@@ -248,20 +239,16 @@ export default function ProductTable() {
               </option>
             ))}
           </select>
-
-          {/* Status Filter */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="border p-2 rounded text-sm"
           >
             <option value="all">All Status</option>
-            <option value="new">New</option>
-            <option value="featured">Featured</option>
-            <option value="sale">Sale</option>
+            <option value="NEW">New</option>
+            <option value="FEATURED">Featured</option>
+            <option value="SALE">Sale</option>
           </select>
-
-          {/* Stock Filter */}
           <select
             value={stockFilter}
             onChange={(e) => setStockFilter(e.target.value)}
@@ -272,17 +259,12 @@ export default function ProductTable() {
             <option value="out">Out of Stock</option>
           </select>
         </div>
-
-        {/* Right: Sorting + Delete */}
         <div className="flex flex-wrap gap-2 justify-start md:justify-end">
-          {/* Delete Selected */}
           {selectedProductIds.length > 0 && (
             <Button variant="destructive" onClick={handleBulkDelete}>
               Delete Selected ({selectedProductIds.length})
             </Button>
           )}
-
-          {/* Sorting */}
           <Button
             variant="outline"
             onClick={() => {
@@ -295,7 +277,6 @@ export default function ProductTable() {
             Sort by Price{" "}
             {sortKey === "price" && (sortOrder === "asc" ? "↑" : "↓")}
           </Button>
-
           <Button
             variant="outline"
             onClick={() => {
@@ -311,7 +292,6 @@ export default function ProductTable() {
         </div>
       </div>
 
-      {/* Desktop Table */}
       <div className="hidden md:block rounded-md overflow-hidden bg-white dark:bg-slate-900">
         <Table className="w-full text-sm text-gray-800 dark:text-gray-200">
           <TableHeader>
@@ -330,7 +310,6 @@ export default function ProductTable() {
                     const isAllSelected = allIds.every((id) =>
                       selectedProductIds.includes(id)
                     );
-
                     if (isAllSelected) {
                       setSelectedProductIds((prev) =>
                         prev.filter((id) => !allIds.includes(id))
@@ -375,15 +354,17 @@ export default function ProductTable() {
                       }}
                     />
                   </TableCell>
-
                   <TableCell>
                     <div className="relative w-16 h-16">
                       <Image
-                        src={product.image || Defoult_Image} // Use default if no image
+                        src={product.main_image?.image || Defoult_Image}
                         alt={product.name}
                         fill
                         className="rounded-md object-cover"
-                        onError={(e) => (e.target.src = Defoult_Image)} // Fallback on error
+                        onError={(e) => {
+                          e.target.src = Defoult_Image;
+                          e.target.onerror = null;
+                        }}
                       />
                     </div>
                   </TableCell>
@@ -399,7 +380,6 @@ export default function ProductTable() {
                       {getStockBadge(product.stock).label} ({product.stock})
                     </span>
                   </TableCell>
-
                   <TableCell
                     className="max-w-[150px] truncate overflow-hidden text-ellipsis whitespace-nowrap"
                     title={product.description}
@@ -443,7 +423,7 @@ export default function ProductTable() {
                 </TableRow>
                 {expandedRows[product.id] && product.variants?.length > 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="bg-gray-50">
+                    <TableCell colSpan={8} className="bg-gray-50">
                       <div className="p-2">
                         <h4 className="text-sm font-medium">Variants:</h4>
                         <ul className="list-disc pl-5 text-sm text-gray-600">
@@ -453,18 +433,19 @@ export default function ProductTable() {
                               className="flex items-center gap-2"
                             >
                               <span>
-                                {variant.size} / {variant.color} - $
-                                {variant.price} (Stock: {variant.stock})
+                                {variant.variant_name} - ${variant.price}{" "}
+                                (Stock: {variant.stock})
                               </span>
                               <div className="relative w-8 h-8">
                                 <Image
-                                  src={variant.image || Defoult_Image} // Use default if no variant image
-                                  alt={`${variant.size}-${variant.color}`}
+                                  src={variant.image || Defoult_Image}
+                                  alt={variant.variant_name}
                                   fill
                                   className="rounded-sm object-cover"
-                                  onError={(e) =>
-                                    (e.target.src = Defoult_Image)
-                                  } // Fallback on error
+                                  onError={(e) => {
+                                    e.target.src = Defoult_Image;
+                                    e.target.onerror = null;
+                                  }}
                                 />
                               </div>
                             </li>
@@ -480,18 +461,20 @@ export default function ProductTable() {
         </Table>
       </div>
 
-      {/* Mobile Card View */}
       <div className="block md:hidden space-y-4">
         {currentProducts.map((product) => (
           <Card key={product.id} className="p-4 shadow-md">
             <div className="flex gap-4">
               <div className="relative w-20 h-20">
                 <Image
-                  src={product.image || Defoult_Image} // Use default if no image
+                  src={product.main_image?.image || Defoult_Image}
                   alt={product.name}
                   fill
                   className="rounded-md object-cover"
-                  onError={(e) => (e.target.src = Defoult_Image)} // Fallback on error
+                  onError={(e) => {
+                    e.target.src = Defoult_Image;
+                    e.target.onerror = null;
+                  }}
                 />
               </div>
               <div className="flex-1 space-y-2">
@@ -504,7 +487,6 @@ export default function ProductTable() {
                 >
                   {getStockBadge(product.stock).label} ({product.stock})
                 </p>
-
                 <p className="text-xs text-gray-500 line-clamp-2">
                   {product.description}
                 </p>
@@ -534,18 +516,19 @@ export default function ProductTable() {
                               className="flex items-center gap-2"
                             >
                               <span>
-                                {variant.size} / {variant.color} - $
-                                {variant.price} (Stock: {variant.stock})
+                                {variant.variant_name} - ${variant.price}{" "}
+                                (Stock: {variant.stock})
                               </span>
                               <div className="relative w-6 h-6">
                                 <Image
-                                  src={variant.image || Defoult_Image} // Use default if no variant image
-                                  alt={`${variant.size}-${variant.color}`}
+                                  src={variant.image || Defoult_Image}
+                                  alt={variant.variant_name}
                                   fill
                                   className="rounded-sm object-cover"
-                                  onError={(e) =>
-                                    (e.target.src = Defoult_Image)
-                                  } // Fallback on error
+                                  onError={(e) => {
+                                    e.target.src = Defoult_Image;
+                                    e.target.onerror = null;
+                                  }}
                                 />
                               </div>
                             </li>
@@ -594,8 +577,6 @@ export default function ProductTable() {
           >
             Previous
           </Button>
-
-          {/* Page number buttons */}
           {Array.from({ length: totalPages }).map((_, i) => (
             <Button
               key={i}
@@ -606,7 +587,6 @@ export default function ProductTable() {
               {i + 1}
             </Button>
           ))}
-
           <Button
             variant="outline"
             onClick={() => setCurrentPage((prev) => prev + 1)}
@@ -615,7 +595,6 @@ export default function ProductTable() {
             Next
           </Button>
         </div>
-
         <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
           Showing page {currentPage} of {totalPages}
         </span>

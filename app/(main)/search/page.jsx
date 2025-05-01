@@ -1,58 +1,77 @@
-import React from "react";
-import Link from "next/link";
-import Image from "next/image";
-import products from "../../../public/products.json"; // Ensure this path is correct
+"use client";
+
+import { useEffect, useState } from "react";
+import axios from "axios";
+import { useSearchParams } from "next/navigation";
 import Container from "@/components/Container";
+import { PRODUCTS_API } from "@/utils/config";
+import ProductList from "@/components/ProductList";
+import Loader from "@/components/Loader";
 
-const SearchPage = async ({ searchParams }) => {
-  // Await `searchParams` before accessing its properties
-  const query = (await searchParams)?.query || "";
+const SearchPage = () => {
+  const searchParams = useSearchParams();
 
-  // Filter products based on the search query
-  const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(query.toLowerCase())
-  );
+  // ✅ Get all filter values from URL
+  const query = searchParams.get("query") || "";
+  const category = searchParams.get("category") || "";
+  const minPrice = searchParams.get("min_price") || "";
+  const maxPrice = searchParams.get("max_price") || "";
+
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [query, category, minPrice, maxPrice]); // ✅ include price in dependencies
+
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      let url = `${PRODUCTS_API}/products/`;
+      const params = new URLSearchParams();
+
+      if (query.trim()) params.set("search", query);
+      if (category.trim()) params.set("category", category);
+      if (minPrice.trim()) params.set("min_price", minPrice);
+      if (maxPrice.trim()) params.set("max_price", maxPrice);
+
+      if (Array.from(params).length > 0) {
+        url += `?${params.toString()}`;
+      }
+
+      const res = await axios.get(url);
+      setProducts(res.data.results || res.data); // supports paginated or non-paginated
+    } catch (error) {
+      console.error("Failed to fetch products", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="bg-gray-50 py-10">
-      <Container>
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">
-          Search Results for "{query}"
-        </h1>
-        {filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
-              <Link
-                key={product.id}
-                href={`/product/${product.slug.current}`} // Access `slug.current`
-                className="bg-white p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow"
-              >
-                <div className="relative h-48 mb-4">
-                  <Image
-                    src={product.image}
-                    alt={product.name}
-                    fill
-                    className="object-cover rounded-lg"
-                    priority // Add priority for above-the-fold images
-                  />
-                </div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  {product.name}
-                </h2>
-                <p className="text-gray-600">${product.price.toFixed(2)}</p>
-                {product.stock > 0 ? (
-                  <p className="text-sm text-green-600">In Stock</p>
-                ) : (
-                  <p className="text-sm text-red-600">Out of Stock</p>
-                )}
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-600">No products found.</p>
-        )}
-      </Container>
-    </div>
+    <Container className="py-10">
+      <h1 className="text-2xl font-bold mb-6">
+        {query
+          ? `Search Results for "${query}"`
+          : category
+          ? "Filtered Products"
+          : "All Products"}
+      </h1>
+
+      {loading ? (
+        <div className="flex justify-center items-center h-40">
+          <Loader />
+        </div>
+      ) : products.length > 0 ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {products.map((product) => (
+            <ProductList key={product.id} product={product} />
+          ))}
+        </div>
+      ) : (
+        <p className="text-gray-500">No products found.</p>
+      )}
+    </Container>
   );
 };
 

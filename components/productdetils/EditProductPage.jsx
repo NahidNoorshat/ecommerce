@@ -21,11 +21,14 @@ export default function EditProductPage() {
     category: "",
     price: "",
     stock: "",
-    image: null,
     has_variants: false,
     variants: [],
   });
-  const [imagePreview, setImagePreview] = useState("");
+  const [existingImages, setExistingImages] = useState([]); // [{ id, image, alt_text, is_main }]
+  const [uploadedImages, setUploadedImages] = useState([]); // Array of File objects
+  const [uploadedImagePreviews, setUploadedImagePreviews] = useState([]); // Array of preview URLs
+  const [mainImageIndex, setMainImageIndex] = useState(0); // Index in combined images (existing + uploaded)
+  const [imagesToDelete, setImagesToDelete] = useState([]); // IDs of existing images to delete
   const [categories, setCategories] = useState([]);
   const [variantAttributes, setVariantAttributes] = useState([]);
   const [variantAttributeValues, setVariantAttributeValues] = useState([]);
@@ -44,7 +47,7 @@ export default function EditProductPage() {
           urls.map(async (url) => {
             const res = await fetch(url);
             if (!res.ok) {
-              const text = await res.text(); // Get raw response
+              const text = await res.text();
               throw new Error(
                 `Failed to fetch ${url}: ${res.status} - ${text.slice(
                   0,
@@ -64,24 +67,35 @@ export default function EditProductPage() {
         setVariantAttributes(attributesData);
         setVariantAttributeValues(valuesData);
 
+        // Initialize form data
         setFormData({
           name: productData.name,
           description: productData.description,
-          category: productData.category, // Assuming ID from backend
+          category: productData.category?.id || "",
           price: productData.price || "",
           stock: productData.stock || "",
-          image: null,
           has_variants: productData.has_variants,
           variants: productData.variants.map((variant) => ({
             id: variant.id,
-            attributes: variant.attributes,
+            attributes: variant.attributes.map((attr) => attr.id),
             stock: variant.stock,
             price: variant.price,
             image: null,
             existingImage: variant.image,
           })),
         });
-        setImagePreview(productData.image || "");
+
+        // Initialize existing images (main_image + gallery_images)
+        const images = [
+          ...(productData.main_image
+            ? [{ ...productData.main_image, is_main: true }]
+            : []),
+          ...(productData.gallery_images || []),
+        ];
+        setExistingImages(images);
+        // Set main image index to the main_image if it exists, else 0
+        const mainIndex = images.findIndex((img) => img.is_main);
+        setMainImageIndex(mainIndex >= 0 ? mainIndex : 0);
       } catch (err) {
         console.error("Fetch error:", err.message);
         toast.error(`Failed to load data: ${err.message}`);
@@ -91,6 +105,11 @@ export default function EditProductPage() {
     };
 
     if (id) fetchData();
+
+    // Cleanup previews on unmount
+    return () => {
+      uploadedImagePreviews.forEach((preview) => URL.revokeObjectURL(preview));
+    };
   }, [id]);
 
   const handleChange = (e) => {
@@ -102,12 +121,37 @@ export default function EditProductPage() {
     }));
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setImagePreview(imageUrl);
-      setFormData({ ...formData, image: file });
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    const validFiles = files.filter((file) => {
+      if (!file.type.startsWith("image/")) {
+        toast.error(`${file.name} is not an image.`);
+        return false;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name} exceeds 5MB.`);
+        return false;
+      }
+      return true;
+    });
+
+    // Clean up previous previews
+    uploadedImagePreviews.forEach((preview) => URL.revokeObjectURL(preview));
+    setUploadedImages(validFiles);
+    const previews = validFiles.map((file) => URL.createObjectURL(file));
+    setUploadedImagePreviews(previews);
+    // Set main image index to the first new image if uploaded, else keep existing
+    if (validFiles.length > 0) {
+      setMainImageIndex(existingImages.length);
+    }
+  };
+
+  const handleRemoveExistingImage = (imageId) => {
+    setImagesToDelete((prev) => [...prev, imageId]);
+    setExistingImages((prev) => prev.filter((img) => img.id !== imageId));
+    // Adjust mainImageIndex if the removed image was the main image
+    if (existingImages.find((img) => img.id === imageId)?.is_main) {
+      setMainImageIndex(0);
     }
   };
 
@@ -116,6 +160,13 @@ export default function EditProductPage() {
     const updatedVariants = [...formData.variants];
 
     if (name === "image" && files && files[0]) {
+      if (
+        !files[0].type.startsWith("image/") ||
+        files[0].size > 5 * 1024 * 1024
+      ) {
+        toast.error("Please upload a valid image (max 5MB).");
+        return;
+      }
       updatedVariants[index].image = files[0];
       updatedVariants[index].preview = URL.createObjectURL(files[0]);
     } else if (name === "attributes") {
@@ -159,6 +210,44 @@ export default function EditProductPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+
+    // Validate required fields
+    if (!formData.name || !formData.description || !formData.category) {
+      toast.error("Please fill in all required fields.");
+      setLoading(false);
+      return;
+    }
+
+    if (formData.has_variants) {
+      if (formData.variants.length === 0) {
+        toast.error(
+          "At least one variant is required when variants are enabled."
+        );
+        setLoading(false);
+        return;
+      }
+      for (const variant of formData.variants) {
+        if (
+          !variant.stock ||
+          !variant.price ||
+          variant.attributes.length === 0
+        ) {
+          toast.error(
+            "All variant fields (stock, price, attributes) must be filled."
+          );
+          setLoading(false);
+          return;
+        }
+      }
+    } else if (!formData.price || !formData.stock) {
+      toast.error(
+        "Price and stock are required for products without variants."
+      );
+      setLoading(false);
+      return;
+    }
+
     const updatedProduct = new FormData();
     updatedProduct.append("name", formData.name);
     updatedProduct.append("description", formData.description);
@@ -170,10 +259,20 @@ export default function EditProductPage() {
       updatedProduct.append("stock", formData.stock || "");
     }
 
-    if (formData.image instanceof File) {
-      updatedProduct.append("image", formData.image);
+    // Append images
+    uploadedImages.forEach((img) =>
+      updatedProduct.append("uploaded_images", img)
+    );
+    // Calculate main_image_index based on combined existing and uploaded images
+    const totalExistingImages = existingImages.length;
+    updatedProduct.append("main_image_index", mainImageIndex.toString());
+
+    // Append images to delete (if supported by backend)
+    if (imagesToDelete.length > 0) {
+      updatedProduct.append("images_to_delete", JSON.stringify(imagesToDelete));
     }
 
+    // Handle variants
     if (formData.has_variants && formData.variants.length > 0) {
       const variantsData = formData.variants.map((variant) => ({
         id: variant.id || null,
@@ -208,17 +307,34 @@ export default function EditProductPage() {
     } catch (err) {
       console.error("Submit error:", err.message);
       toast.error(`Error updating product: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
   if (loading) return <Loader />;
   if (!product) return <p className="text-red-500">Product not found</p>;
 
+  // Combine existing and uploaded images for display
+  const allImages = [
+    ...existingImages.map((img) => ({
+      id: img.id,
+      src: img.image,
+      alt: img.alt_text,
+      isExisting: true,
+    })),
+    ...uploadedImagePreviews.map((preview, index) => ({
+      id: `new-${index}`,
+      src: preview,
+      alt: `New Image ${index + 1}`,
+      isExisting: false,
+    })),
+  ];
+
   return (
     <Card className="p-6 max-w-3xl mx-auto bg-white dark:bg-gray-900 dark:text-white shadow-lg rounded-lg">
       <h2 className="text-2xl font-semibold mb-4">Edit Product</h2>
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Form fields remain the same as in your previous message */}
         <div>
           <label className="block text-sm font-medium dark:text-gray-300">
             Product Name
@@ -290,23 +406,46 @@ export default function EditProductPage() {
         )}
         <div>
           <label className="block text-sm font-medium dark:text-gray-300">
-            Product Image
+            Product Images (Select multiple)
           </label>
           <input
             type="file"
-            onChange={handleImageChange}
+            multiple
+            onChange={handleFileChange}
             accept="image/*"
             className="block w-full text-sm border p-2 rounded dark:bg-gray-800 dark:border-gray-700 dark:text-white"
           />
-          {imagePreview && (
-            <div className="mt-2">
-              <Image
-                src={imagePreview}
-                alt="Product Image"
-                width={100}
-                height={100}
-                className="rounded-md object-cover"
-              />
+          {allImages.length > 0 && (
+            <div className="flex flex-wrap gap-4 mt-4">
+              {allImages.map((image, index) => (
+                <div key={image.id} className="relative">
+                  <Image
+                    src={image.src}
+                    alt={image.alt}
+                    width={100}
+                    height={100}
+                    className={`rounded-md object-cover ${
+                      index === mainImageIndex ? "border-4 border-blue-500" : ""
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMainImageIndex(index)}
+                    className="absolute top-0 right-0 bg-blue-600 text-white text-xs px-1 py-0.5 rounded-bl-lg"
+                  >
+                    {index === mainImageIndex ? "Main" : "Set Main"}
+                  </button>
+                  {image.isExisting && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExistingImage(image.id)}
+                      className="absolute top-0 left-0 bg-red-600 text-white text-xs px-1 py-0.5 rounded-br-lg"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -433,8 +572,9 @@ export default function EditProductPage() {
           <Button
             type="submit"
             className="dark:bg-blue-600 dark:hover:bg-blue-700"
+            disabled={loading}
           >
-            Update Product
+            {loading ? "Updating..." : "Update Product"}
           </Button>
           <Button
             variant="outline"
