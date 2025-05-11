@@ -8,11 +8,13 @@ import AddToCartButton from "./AddToCartButton";
 import ProductCartBar from "./ProductCartBar";
 import { getCategoryBreadcrumb } from "@/utils/categoryUtils";
 import React from "react";
+import StarRatingDisplay from "./StarRatingDisplay";
+import { HiBadgeCheck } from "react-icons/hi";
 
 const ProductList = React.memo(({ product }) => {
-  console.log(
-    `Rendering ProductList for ${product.name}, timestamp: ${Date.now()}`
-  );
+  // console.log(
+  //   `Rendering ProductList for ${product.name}, timestamp: ${Date.now()}`
+  // );
 
   // Get lowest price from variants
   const getPriceFromVariant = (variant) => {
@@ -50,6 +52,12 @@ const ProductList = React.memo(({ product }) => {
     <div className="border border-gray-300 rounded-lg overflow-hidden group text-sm">
       <div className="border-b border-b-gray-300 overflow-hidden relative">
         <div className="relative w-full pt-[100%] bg-gray-100 dark:bg-gray-800 overflow-hidden">
+          {product.is_verified && (
+            <div className="absolute top-2 right-2 flex items-center gap-1 bg-blue-600 text-white text-xs font-semibold px-2 py-1 rounded-full shadow z-10">
+              <HiBadgeCheck className="h-4 w-4 text-white" />
+              Verified
+            </div>
+          )}
           <Link href={`/product/${product.slug}`}>
             {mainImage && (
               <Image
@@ -92,18 +100,11 @@ const ProductList = React.memo(({ product }) => {
             {getCategoryBreadcrumb(product?.category)}
           </p>
 
-          <div className="text-lightText flex items-center gap-1">
-            {Array.from({ length: 5 }).map((_, index) => {
-              const isLastStar = index === 4;
-              return (
-                <LuStar
-                  key={index}
-                  className={isLastStar ? "text-gray-400" : "text-orange-400"}
-                  fill={!isLastStar ? "#fca99b" : "transparent"}
-                />
-              );
-            })}
-          </div>
+          {product.average_rating > 0 ? (
+            <StarRatingDisplay rating={product.average_rating} />
+          ) : (
+            <span className="text-xs text-gray-400 italic">No reviews yet</span>
+          )}
         </div>
 
         <p className="text-base text-gray-600 tracking-wide font-semibold line-clamp-1 capitalize">

@@ -115,10 +115,11 @@ export default function AdminOrderDetailsPage() {
               className="flex gap-4 border rounded-lg p-4 items-center"
             >
               <img
-                src={item.product.image}
+                src={item.product.main_image?.image}
                 alt={item.product.name}
                 className="w-20 h-20 object-cover rounded"
               />
+
               <div className="flex-1">
                 <h2 className="font-semibold">{item.product.name}</h2>
                 <p className="text-sm text-gray-600">

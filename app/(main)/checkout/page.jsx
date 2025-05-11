@@ -16,6 +16,9 @@ import {
 import { ORDERS_API, SHIPPIN_API } from "@/utils/config";
 import { checkout, fetchCart } from "@/lib/feature/card/cartSlice";
 import { secureFetch } from "@/lib/api/secureFetch";
+import { setNotifications } from "@/lib/feature/notifications/notificationSlice";
+import { NOTIFICATIONS_API } from "@/utils/config";
+import secureAxios from "@/lib/api/secureAxios";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY);
 
@@ -53,6 +56,18 @@ const CheckoutForm = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const refreshNotifications = async () => {
+    try {
+      const res = await secureAxios.get(`${NOTIFICATIONS_API}/notifications`);
+      const data = res.data;
+      dispatch(
+        setNotifications(Array.isArray(data) ? data : data.results || [])
+      );
+    } catch (err) {
+      console.error("Failed to refresh notifications", err);
+    }
+  };
+
   useEffect(() => {
     const fetchShippingMethods = async () => {
       try {
@@ -83,11 +98,11 @@ const CheckoutForm = () => {
 
   useEffect(() => {
     if (shipping.shipping_method_id) {
-      handleApplyCoupon();
+      handleApplyCoupon(false);
     }
   }, [shipping.shipping_method_id]);
 
-  const handleApplyCoupon = async () => {
+  const handleApplyCoupon = async (isUserAction = false) => {
     setLoading(true);
 
     const queryParams = new URLSearchParams({
@@ -99,43 +114,60 @@ const CheckoutForm = () => {
     const url = `${ORDERS_API}/preview/?${queryParams.toString()}`;
 
     try {
-      const res = await secureFetch(url); // ✅ secured API request
+      const res = await secureFetch(url);
       const data = await res.json();
 
       const selectedMethod = shippingMethods.find(
         (method) => method.id === shipping.shipping_method_id
       );
       const fallbackShippingCost = selectedMethod
-        ? parseFloat(selectedMethod.price)
+        ? parseFloat(selectedMethod.price) || 0
         : 0;
 
+      // Ensure all values are numbers
+      const shippingCost = parseFloat(
+        data.shipping_cost ?? fallbackShippingCost
+      );
+      const discountAmount = parseFloat(data.discount_amount || 0);
+      const calculatedSubtotal = parseFloat(subtotal);
+
+      // Calculate total_price explicitly
+      const totalPrice = calculatedSubtotal + shippingCost - discountAmount;
+
       setPreview({
-        ...data,
-        shipping_cost:
-          data.shipping_cost !== undefined
-            ? data.shipping_cost
-            : fallbackShippingCost,
+        subtotal: calculatedSubtotal,
+        shipping_cost: shippingCost,
+        discount_amount: discountAmount,
+        total_price: totalPrice,
       });
 
-      toast.success(
-        couponCode ? `Coupon "${couponCode}" applied!` : "Preview updated."
-      );
+      if (isUserAction) {
+        toast.success(
+          couponCode ? `Coupon "${couponCode}" applied!` : "Preview updated."
+        );
+      }
     } catch (err) {
       const selectedMethod = shippingMethods.find(
         (method) => method.id === shipping.shipping_method_id
       );
-      const shippingCost = selectedMethod
-        ? parseFloat(selectedMethod.price)
+      const fallbackShippingCost = selectedMethod
+        ? parseFloat(selectedMethod.price) || 0
         : 0;
 
+      // Ensure all values are numbers in the catch block
+      const calculatedSubtotal = parseFloat(subtotal);
+      const totalPrice = calculatedSubtotal + fallbackShippingCost;
+
       setPreview({
-        subtotal,
-        shipping_cost: shippingCost,
+        subtotal: calculatedSubtotal,
+        shipping_cost: fallbackShippingCost,
         discount_amount: 0,
-        total_price: subtotal + shippingCost,
+        total_price: totalPrice,
       });
 
-      toast.error("Failed to apply coupon or fetch preview.");
+      if (isUserAction) {
+        toast.error("Failed to apply coupon or fetch preview.");
+      }
     } finally {
       setLoading(false);
     }
@@ -294,7 +326,6 @@ const CheckoutForm = () => {
             value={shipping.shipping_method_id || ""}
             onChange={(e) => {
               const newId = parseInt(e.target.value) || null;
-              console.log("Shipping method changed to:", newId);
               setShipping({
                 ...shipping,
                 shipping_method_id: newId,
@@ -320,10 +351,10 @@ const CheckoutForm = () => {
             type="text"
             value={couponCode}
             onChange={(e) => setCouponCode(e.target.value)}
-            placeholder="Enter coupon code (e.g., abcd123)"
+            placeholder="Enter coupon code"
             className="w-full p-2 border rounded-md"
           />
-          <Button onClick={handleApplyCoupon} disabled={loading}>
+          <Button onClick={() => handleApplyCoupon(true)} disabled={loading}>
             {loading ? "Applying..." : "Apply"}
           </Button>
         </div>
@@ -338,8 +369,6 @@ const CheckoutForm = () => {
         >
           <option value="cod">Cash on Delivery</option>
           <option value="card">Credit/Debit Card (Stripe)</option>
-          <option value="paypal">PayPal</option>
-          <option value="crypto">Cryptocurrency</option>
         </select>
       </div>
 

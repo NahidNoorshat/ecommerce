@@ -10,6 +10,13 @@ import { PRODUCTS_API } from "@/utils/config";
 import Image from "next/image";
 import { toast } from "sonner";
 import Loader from "../Loader";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Bold from "@tiptap/extension-bold";
+import Italic from "@tiptap/extension-italic";
+import Underline from "@tiptap/extension-underline";
+import BulletList from "@tiptap/extension-bullet-list";
+import ListItem from "@tiptap/extension-list-item";
 
 export default function EditProductPage() {
   const router = useRouter();
@@ -23,16 +30,28 @@ export default function EditProductPage() {
     stock: "",
     has_variants: false,
     variants: [],
+    certificate_description: "", // Added
+    certificate_file: null, // Added
   });
-  const [existingImages, setExistingImages] = useState([]); // [{ id, image, alt_text, is_main }]
-  const [uploadedImages, setUploadedImages] = useState([]); // Array of File objects
-  const [uploadedImagePreviews, setUploadedImagePreviews] = useState([]); // Array of preview URLs
-  const [mainImageIndex, setMainImageIndex] = useState(0); // Index in combined images (existing + uploaded)
-  const [imagesToDelete, setImagesToDelete] = useState([]); // IDs of existing images to delete
+  const [existingImages, setExistingImages] = useState([]);
+  const [uploadedImages, setUploadedImages] = useState([]);
+  const [uploadedImagePreviews, setUploadedImagePreviews] = useState([]);
+  const [mainImageIndex, setMainImageIndex] = useState(0);
+  const [imagesToDelete, setImagesToDelete] = useState([]);
   const [categories, setCategories] = useState([]);
   const [variantAttributes, setVariantAttributes] = useState([]);
   const [variantAttributeValues, setVariantAttributeValues] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Initialize Tiptap editor
+  const editor = useEditor({
+    extensions: [StarterKit, Bold, Italic, Underline, BulletList, ListItem],
+    content: formData.certificate_description,
+    onUpdate: ({ editor }) => {
+      const html = editor.getHTML();
+      setFormData((prev) => ({ ...prev, certificate_description: html }));
+    },
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -83,9 +102,11 @@ export default function EditProductPage() {
             image: null,
             existingImage: variant.image,
           })),
+          certificate_description: productData.certificate_description || "", // Added
+          certificate_file: null, // Will be handled separately if updating
         });
 
-        // Initialize existing images (main_image + gallery_images)
+        // Initialize existing images
         const images = [
           ...(productData.main_image
             ? [{ ...productData.main_image, is_main: true }]
@@ -93,9 +114,13 @@ export default function EditProductPage() {
           ...(productData.gallery_images || []),
         ];
         setExistingImages(images);
-        // Set main image index to the main_image if it exists, else 0
         const mainIndex = images.findIndex((img) => img.is_main);
         setMainImageIndex(mainIndex >= 0 ? mainIndex : 0);
+
+        // Update editor content
+        if (editor && productData.certificate_description) {
+          editor.commands.setContent(productData.certificate_description);
+        }
       } catch (err) {
         console.error("Fetch error:", err.message);
         toast.error(`Failed to load data: ${err.message}`);
@@ -110,7 +135,7 @@ export default function EditProductPage() {
     return () => {
       uploadedImagePreviews.forEach((preview) => URL.revokeObjectURL(preview));
     };
-  }, [id]);
+  }, [id, editor]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -119,6 +144,23 @@ export default function EditProductPage() {
       [name]: type === "checkbox" ? checked : value,
       ...(name === "has_variants" && !checked ? { variants: [] } : {}),
     }));
+  };
+
+  const handleCertificateFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const isValidType = ["application/pdf", "image/jpeg", "image/png"].includes(
+      file.type
+    );
+    if (!isValidType) {
+      toast.error("Only PDF or image files are allowed for certificate.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Certificate file must be under 5MB.");
+      return;
+    }
+    setFormData((prev) => ({ ...prev, certificate_file: file }));
   };
 
   const handleFileChange = (e) => {
@@ -135,12 +177,10 @@ export default function EditProductPage() {
       return true;
     });
 
-    // Clean up previous previews
     uploadedImagePreviews.forEach((preview) => URL.revokeObjectURL(preview));
     setUploadedImages(validFiles);
     const previews = validFiles.map((file) => URL.createObjectURL(file));
     setUploadedImagePreviews(previews);
-    // Set main image index to the first new image if uploaded, else keep existing
     if (validFiles.length > 0) {
       setMainImageIndex(existingImages.length);
     }
@@ -149,7 +189,6 @@ export default function EditProductPage() {
   const handleRemoveExistingImage = (imageId) => {
     setImagesToDelete((prev) => [...prev, imageId]);
     setExistingImages((prev) => prev.filter((img) => img.id !== imageId));
-    // Adjust mainImageIndex if the removed image was the main image
     if (existingImages.find((img) => img.id === imageId)?.is_main) {
       setMainImageIndex(0);
     }
@@ -212,7 +251,6 @@ export default function EditProductPage() {
     e.preventDefault();
     setLoading(true);
 
-    // Validate required fields
     if (!formData.name || !formData.description || !formData.category) {
       toast.error("Please fill in all required fields.");
       setLoading(false);
@@ -259,20 +297,26 @@ export default function EditProductPage() {
       updatedProduct.append("stock", formData.stock || "");
     }
 
-    // Append images
+    // Append certificate fields
+    if (formData.certificate_description) {
+      updatedProduct.append(
+        "certificate_description",
+        formData.certificate_description
+      );
+    }
+    if (formData.certificate_file instanceof File) {
+      updatedProduct.append("certificate_file", formData.certificate_file);
+    }
+
     uploadedImages.forEach((img) =>
       updatedProduct.append("uploaded_images", img)
     );
-    // Calculate main_image_index based on combined existing and uploaded images
-    const totalExistingImages = existingImages.length;
     updatedProduct.append("main_image_index", mainImageIndex.toString());
 
-    // Append images to delete (if supported by backend)
     if (imagesToDelete.length > 0) {
       updatedProduct.append("images_to_delete", JSON.stringify(imagesToDelete));
     }
 
-    // Handle variants
     if (formData.has_variants && formData.variants.length > 0) {
       const variantsData = formData.variants.map((variant) => ({
         id: variant.id || null,
@@ -315,7 +359,6 @@ export default function EditProductPage() {
   if (loading) return <Loader />;
   if (!product) return <p className="text-red-500">Product not found</p>;
 
-  // Combine existing and uploaded images for display
   const allImages = [
     ...existingImages.map((img) => ({
       id: img.id,
@@ -404,6 +447,78 @@ export default function EditProductPage() {
             </div>
           </>
         )}
+        {/* Certificate Description (Tiptap Editor) */}
+        <div>
+          <label className="block text-sm font-medium dark:text-gray-300">
+            Certificate Description (Rich Text)
+          </label>
+          {editor && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => editor.chain().focus().toggleBold().run()}
+                className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-sm rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                Bold
+              </button>
+              <button
+                type="button"
+                onClick={() => editor.chain().focus().toggleItalic().run()}
+                className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-sm rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                Italic
+              </button>
+              <button
+                type="button"
+                onClick={() => editor.chain().focus().toggleUnderline().run()}
+                className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-sm rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                Underline
+              </button>
+              <button
+                type="button"
+                onClick={() => editor.chain().focus().toggleBulletList().run()}
+                className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-sm rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                Bullet List
+              </button>
+            </div>
+          )}
+          <div className="w-full bg-white dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600">
+            <EditorContent
+              editor={editor}
+              className="w-full p-3 outline-none prose prose-sm dark:prose-invert min-h-[150px] max-w-full"
+              style={{ maxWidth: "100%" }}
+            />
+          </div>
+        </div>
+        {/* Certificate File */}
+        <div>
+          <label className="block text-sm font-medium dark:text-gray-300">
+            Upload Certificate File (PDF or Image)
+          </label>
+          <input
+            type="file"
+            name="certificate_file"
+            accept=".pdf,image/*"
+            onChange={handleCertificateFileChange}
+            className="block w-full text-sm border p-2 rounded dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+          />
+          {product.certificate_file && !formData.certificate_file && (
+            <div className="mt-2">
+              <p className="text-sm dark:text-gray-300">
+                Existing:{" "}
+                <a
+                  href={product.certificate_file}
+                  target="_blank"
+                  className="text-blue-500"
+                >
+                  View Current File
+                </a>
+              </p>
+            </div>
+          )}
+        </div>
         <div>
           <label className="block text-sm font-medium dark:text-gray-300">
             Product Images (Select multiple)

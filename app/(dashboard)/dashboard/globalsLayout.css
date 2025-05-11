@@ -79,3 +79,13 @@
     @apply bg-background text-foreground overflow-x-hidden;
   }
 }
+
+.ProseMirror {
+  min-height: 150px;
+  outline: none;
+}
+
+.ProseMirror p {
+  margin: 0;
+  padding: 0;
+}

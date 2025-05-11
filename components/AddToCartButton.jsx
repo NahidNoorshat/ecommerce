@@ -9,17 +9,13 @@ import {
   updateCartItem,
   removeFromCart,
 } from "@/lib/feature/card/cartSlice";
+import { showLoginModal } from "@/lib/feature/auth/loginModalSlice"; // ✅ Import showLoginModal
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 const AddToCartButton = React.memo(({ product, className }) => {
   const dispatch = useDispatch();
   const router = useRouter();
-
-  console.log(
-    `Rendering AddToCartButton for ${product.name}, timestamp: ${Date.now()}`
-  );
-  console.log(`Product ref for ${product.name}:`, product);
 
   const getCheapestVariant = (variants) => {
     if (!variants || variants.length === 0) return null;
@@ -82,8 +78,15 @@ const AddToCartButton = React.memo(({ product, className }) => {
 
     const token = localStorage.getItem("access");
     if (!token) {
+      // ✅ Add product to cart slice (persisted) before showing modal
+      const payload = {
+        product: { id: product.id, name: product.name, price: effectivePrice },
+        quantity: 1,
+        variant: selectedVariant ? { id: selectedVariant.id } : null,
+      };
+      dispatch(addToCart(payload)); // Add to cart slice
       toast.error("Please log in to add items to your cart");
-      router.push("/login");
+      dispatch(showLoginModal()); // Show login modal
       return;
     }
 
@@ -105,7 +108,7 @@ const AddToCartButton = React.memo(({ product, className }) => {
       toast.error(errorMsg);
       if (error.status === 401) {
         toast.info("Session expired. Redirecting to login...");
-        router.push("/login");
+        dispatch(showLoginModal()); // Show modal instead of redirect
       }
     }
   };
@@ -115,17 +118,11 @@ const AddToCartButton = React.memo(({ product, className }) => {
       if (cartItem) {
         const newQuantity = cartItem.quantity + 1;
         const stock = cartItem.variant?.stock || cartItem.product.stock;
-        console.log("Increasing cart item:", {
-          id: cartItem.id,
-          currentQuantity: cartItem.quantity,
-          newQuantity,
-          stock,
-        });
         if (newQuantity > stock) {
           toast.info(`Maximum stock reached (${stock} available)`);
           return;
         }
-        const result = await dispatch(
+        await dispatch(
           updateCartItem({ cartItemId: cartItem.id, quantity: newQuantity })
         ).unwrap();
         toast.success("Quantity increased!");
@@ -138,7 +135,6 @@ const AddToCartButton = React.memo(({ product, className }) => {
         toast.success("Added to cart!");
       }
     } catch (error) {
-      console.error("Handle increase error:", error);
       const errorMessage =
         error?.data?.quantity || error.message || "Failed to update quantity";
       toast.error(errorMessage);
@@ -156,19 +152,12 @@ const AddToCartButton = React.memo(({ product, className }) => {
         toast.success("Item removed from cart.");
       } else {
         const newQuantity = itemCount - 1;
-        console.log("Decreasing cart item:", {
-          id: cartItemId,
-          currentQuantity: itemCount,
-          newQuantity,
-          stock: cartItem.variant?.stock || cartItem.product.stock,
-        });
         await dispatch(
           updateCartItem({ cartItemId, quantity: newQuantity })
         ).unwrap();
         toast.success("Quantity decreased!");
       }
     } catch (error) {
-      console.error("Handle decrease error:", error);
       const errorMessage =
         error?.data?.quantity ||
         error?.detail ||

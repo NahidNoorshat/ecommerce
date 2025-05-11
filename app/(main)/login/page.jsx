@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
 import { setUser } from "@/lib/feature/users/userSlice";
 import { USER_AUTH } from "@/utils/config";
+import secureAxios from "@/lib/api/secureAxios";
+import { NOTIFICATIONS_API } from "@/utils/config";
+import { setNotifications } from "@/lib/feature/notifications/notificationSlice";
+
 import { toast } from "sonner";
 
 const Login = () => {
@@ -18,10 +22,23 @@ const Login = () => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+  const fetchNotifications = async () => {
+    try {
+      const res = await secureAxios.get(`${NOTIFICATIONS_API}/notifications`);
+      const data = res.data;
+      dispatch(
+        setNotifications(Array.isArray(data) ? data : data.results || [])
+      );
+    } catch (error) {
+      console.error("Failed to fetch notifications after login", error);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setErrors({ username: "", password: "" });
+
     try {
       const response = await fetch(`${USER_AUTH}/login/`, {
         method: "POST",
@@ -50,34 +67,38 @@ const Login = () => {
         return;
       }
 
-      const profilePicture = data.profile_picture
-        ? data.profile_picture.replace(/^\/api\/newauth/, "")
-        : null;
+      // ✅ New: Extract from `data.user`
+      const user = data.user;
 
       const userData = {
-        username: data.username || "Guest",
-        role: data.role || "unknown",
-        profile_picture: profilePicture,
+        id: user.id,
+        username: user.username || "Guest",
+        role: user.role || "unknown",
+        email: user.email,
+        phone_number: user.phone_number,
+        address: user.address,
+        is_verified: user.is_verified,
+        profile_picture: user.profile_picture
+          ? user.profile_picture.replace(/^\/api\/newauth/, "")
+          : null,
       };
 
       localStorage.setItem("access", data.access);
       localStorage.setItem("refresh", data.refresh);
 
-      // ✅ No manual localStorage.setItem("user") here
       dispatch(setUser(userData));
+      await fetchNotifications();
 
       toast.success("Login successful!");
 
-      if (data.role === "admin") {
+      if (user.role === "admin") {
         router.push("/dashboard/admin");
-      } else if (data.role === "customer") {
-        router.push("/");
       } else {
         router.push("/");
       }
     } catch (err) {
       console.error("Login error:", err);
-      toast.error(err.message || "Invalid credentials");
+      toast.error(err.message || "Login failed");
     } finally {
       setLoading(false);
     }

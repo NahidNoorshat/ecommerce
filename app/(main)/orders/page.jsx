@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ORDERS_API } from "@/utils/config";
 import { secureFetch } from "@/lib/api/secureFetch"; // ✅ Token refresh handler
+import Loader from "@/components/Loader";
 
 const OrdersPage = () => {
   const router = useRouter();
@@ -49,10 +50,8 @@ const OrdersPage = () => {
     }
   };
 
-  if (loading || status === "loading") {
-    return (
-      <div className="text-center py-20 text-lg">Loading your orders...</div>
-    );
+  if (loading) {
+    return <Loader />;
   }
 
   if (error) {

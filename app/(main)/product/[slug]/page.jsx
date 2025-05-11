@@ -3,13 +3,19 @@
 import AddToCartButton from "@/components/AddToCartButton";
 import Container from "@/components/Container";
 import PriceView from "@/components/PriceView";
+import Loader from "@/components/Loader"; // Import the new Loader component
 import { PRODUCTS_API } from "@/utils/config";
 import axios from "axios";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import React, { useState, useEffect } from "react";
-import { LuStar } from "react-icons/lu";
 import { toast } from "sonner";
+import useReviews from "@/hooks/useReviews";
+import ProductReviews from "@/components/ProductReviews";
+import ReviewForm from "@/components/ReviewForm";
+import StarRatingDisplay from "@/components/StarRatingDisplay";
+import { HiBadgeCheck } from "react-icons/hi";
+import Modal from "@/components/Modal";
 
 const ProductPage = ({ params: paramsPromise }) => {
   const [product, setProduct] = useState(null);
@@ -19,38 +25,28 @@ const ProductPage = ({ params: paramsPromise }) => {
   const [error, setError] = useState(null);
   const [attributesMap, setAttributesMap] = useState({});
   const params = React.use(paramsPromise);
+  const [showVerification, setShowVerification] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [productRes, attributesRes] = await Promise.all([
-          axios.get(`${PRODUCTS_API}/products/${params.slug}/`), // Changed to detail endpoint
+          axios.get(`${PRODUCTS_API}/products/${params.slug}/`),
           axios.get(`${PRODUCTS_API}/variant-attributes/`),
         ]);
 
-        console.log("Product response:", productRes.data);
-
         const foundProduct = productRes.data;
-        if (!foundProduct?.slug) {
-          console.warn(`No product found for slug: ${params.slug}`);
-          notFound();
-        }
+        if (!foundProduct?.slug) return notFound();
 
-        // Map attributes
         const attrMap = {};
         attributesRes.data.forEach((attr) => {
           attrMap[attr.id] = attr.name;
         });
+
         setAttributesMap(attrMap);
-
         setProduct(foundProduct);
-
-        // No auto-selection of default variant
       } catch (err) {
-        console.error("Error fetching data:", err);
-        if (err.response?.status === 404) {
-          notFound();
-        }
+        if (err.response?.status === 404) return notFound();
         setError("Failed to load product");
       }
     };
@@ -58,18 +54,21 @@ const ProductPage = ({ params: paramsPromise }) => {
     fetchData();
   }, [params.slug]);
 
+  const {
+    reviews,
+    isLoading: reviewsLoading,
+    isError: reviewsError,
+    mutate,
+  } = useReviews(product?.id || null);
+
+  // Use the new Loader component during loading state
   if (!product && !error) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="w-12 h-12 border-4 border-gray-300 border-t-black rounded-full animate-spin"></div>
-      </div>
-    );
+    return <Loader />;
   }
 
   if (error) return <div>{error}</div>;
 
   const variants = product.variants || [];
-
   const allImages = [
     ...(product.main_image ? [product.main_image] : []),
     ...(product.gallery_images || []),
@@ -78,19 +77,13 @@ const ProductPage = ({ params: paramsPromise }) => {
       : []),
   ].filter((item) => item && item.image);
 
-  console.log("All images:", allImages);
-  console.log("Variants:", variants);
-
   const getVariantAttributes = () => {
     const attributeMap = {};
     variants.forEach((variant) => {
       variant.attributes.forEach((attr) => {
-        if (attr.attribute && attr.value) {
-          if (!attributeMap[attr.attribute]) {
-            attributeMap[attr.attribute] = new Set();
-          }
-          attributeMap[attr.attribute].add(attr.value);
-        }
+        if (!attributeMap[attr.attribute])
+          attributeMap[attr.attribute] = new Set();
+        attributeMap[attr.attribute].add(attr.value);
       });
     });
     return attributeMap;
@@ -105,22 +98,14 @@ const ProductPage = ({ params: paramsPromise }) => {
   };
 
   const variantAttributes = getVariantAttributes();
-  console.log("Variant attributes:", variantAttributes);
 
   const handleAttributeChange = (attribute, value) => {
     const newAttributes = { ...selectedAttributes, [attribute]: value };
     setSelectedAttributes(newAttributes);
 
     const newVariant = findMatchingVariant(newAttributes);
-    if (newVariant) {
-      setSelectedVariant(newVariant);
-      if (newVariant.image) {
-        setSelectedImage(newVariant.image);
-      }
-    } else {
-      setSelectedVariant(null);
-      setSelectedImage(null);
-    }
+    setSelectedVariant(newVariant || null);
+    setSelectedImage(newVariant?.image || null);
   };
 
   const stockQuantity = selectedVariant?.stock ?? product?.stock ?? 0;
@@ -153,13 +138,13 @@ const ProductPage = ({ params: paramsPromise }) => {
                 onClick={() => setSelectedImage(item.image)}
                 className={`flex-shrink-0 w-20 h-20 border-2 rounded-md overflow-hidden cursor-pointer transition-all ${
                   selectedImage === item.image
-                    ? "border-2 border-black"
-                    : "border border-gray-300 hover:border-black"
+                    ? "border-black"
+                    : "border-gray-300 hover:border-black"
                 }`}
               >
                 <Image
                   src={item.image}
-                  alt={`${product.name}`}
+                  alt={product.name}
                   width={80}
                   height={80}
                   sizes="80px"
@@ -175,16 +160,10 @@ const ProductPage = ({ params: paramsPromise }) => {
           <div>
             <p className="text-4xl font-bold mb-2">{product?.name}</p>
             <div className="flex items-center gap-2">
-              <div className="text-lightText flex items-center gap-0.5 text-sm">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <LuStar
-                    key={index}
-                    fill={index < 4 ? "#fca99b" : "transparent"}
-                    className={index < 4 ? "text-lightOrange" : "text-gray-500"}
-                  />
-                ))}
-              </div>
-              <p className="text-sm font-medium text-gray-500">(25 reviews)</p>
+              <StarRatingDisplay rating={product?.average_rating || 0} />
+              <p className="text-sm font-medium text-gray-500">
+                ({reviews?.length || 0} reviews)
+              </p>
             </div>
           </div>
 
@@ -198,16 +177,29 @@ const ProductPage = ({ params: paramsPromise }) => {
             className="text-lg font-bold"
           />
 
-          {stockQuantity > 0 ? (
-            <p className="bg-green-100 w-32 text-center text-green-600 text-sm py-2.5 font-semibold rounded-lg">
-              In Stock ({stockQuantity})
+          <div className="flex items-center  gap-4">
+            <p
+              className={`text-sm px-4 py-2.5 font-semibold rounded-lg ${
+                stockQuantity > 0
+                  ? "bg-green-100 text-green-600"
+                  : "bg-red-100 text-red-600"
+              }`}
+            >
+              {stockQuantity > 0
+                ? `In Stock (${stockQuantity})`
+                : `Out of Stock (${stockQuantity})`}
             </p>
-          ) : (
-            <p className="bg-red-100 w-32 text-center text-red-600 text-sm py-2.5 font-semibold rounded-lg">
-              Out of Stock ({stockQuantity})
-            </p>
-          )}
 
+            {product.is_verified && (
+              <button
+                onClick={() => setShowVerification(true)}
+                className="flex items-center gap-1  bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-2 rounded-full shadow hover:bg-blue-200 transition"
+              >
+                <HiBadgeCheck className="w-4 h-4 text-blue-600" />
+                Verified
+              </button>
+            )}
+          </div>
           <p className="text-sm text-gray-600 tracking-wide">
             {product?.description}
           </p>
@@ -216,19 +208,16 @@ const ProductPage = ({ params: paramsPromise }) => {
           {product.has_variants && variants.length > 0 && (
             <div className="flex flex-col gap-4 mt-6">
               <p className="text-lg font-semibold">Select Variant:</p>
-
               {Object.entries(variantAttributes).map(
                 ([attributeId, values]) => (
                   <div key={attributeId} className="flex flex-col gap-2">
                     <p className="text-sm font-medium text-gray-700">
                       {attributesMap[attributeId] || attributeId}:
                     </p>
-
                     <div className="flex flex-wrap gap-2">
                       {Array.from(values).map((value) => {
                         const isSelected =
                           selectedAttributes[attributeId] === value;
-
                         return (
                           <button
                             key={value}
@@ -258,25 +247,99 @@ const ProductPage = ({ params: paramsPromise }) => {
             selectedVariant ? (
               <AddToCartButton product={{ ...product, selectedVariant }} />
             ) : (
-              <div className="flex flex-col gap-2 mt-4">
-                <button
-                  type="button"
-                  disabled
-                  onClick={() =>
-                    toast.error(
-                      "Combination not available. Please change options."
-                    )
-                  }
-                  className="w-full px-4 py-2 rounded-md bg-gray-300 text-gray-600 cursor-not-allowed"
-                >
-                  Select correct variant first
-                </button>
-              </div>
+              <button
+                type="button"
+                disabled
+                onClick={() =>
+                  toast.error(
+                    "Combination not available. Please change options."
+                  )
+                }
+                className="w-full px-4 py-2 rounded-md bg-gray-300 text-gray-600 cursor-not-allowed"
+              >
+                Select correct variant first
+              </button>
             )
           ) : (
             <AddToCartButton product={product} />
           )}
+
+          {/* Reviews */}
+          <div className="max-w-3xl mt-12 border-t pt-8">
+            <h2 className="text-xl font-bold mb-4">Customer Reviews</h2>
+
+            {reviewsLoading && (
+              <p className="text-gray-500">Loading reviews...</p>
+            )}
+            {reviewsError && (
+              <p className="text-red-500">Failed to load reviews.</p>
+            )}
+
+            {!reviewsLoading && !reviewsError && (
+              <>
+                <ProductReviews productId={product.id} />
+                <ReviewForm
+                  productId={product.id}
+                  userToken={
+                    typeof window !== "undefined"
+                      ? localStorage.getItem("token")
+                      : null
+                  }
+                  mutate={mutate}
+                />
+              </>
+            )}
+          </div>
         </div>
+        {showVerification && (
+          <Modal onClose={() => setShowVerification(false)}>
+            <div className="p-4">
+              <h3 className="text-lg font-bold mb-3 text-blue-700 flex items-center gap-2">
+                <HiBadgeCheck className="w-5 h-5 text-blue-600" />
+                Product Verification Details
+              </h3>
+
+              {product.certificate_description ? (
+                <div
+                  className="prose max-w-none text-sm"
+                  dangerouslySetInnerHTML={{
+                    __html: product.certificate_description,
+                  }}
+                />
+              ) : (
+                <p className="text-sm text-gray-600 italic">
+                  No description provided.
+                </p>
+              )}
+
+              {product.certificate_file && (
+                <div className="mt-4">
+                  <p className="text-sm font-semibold mb-1">
+                    Verification File:
+                  </p>
+                  {product.certificate_file.endsWith(".pdf") ? (
+                    <a
+                      href={product.certificate_file}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 underline text-sm"
+                    >
+                      View Certificate PDF
+                    </a>
+                  ) : (
+                    <Image
+                      src={product.certificate_file}
+                      alt="Certificate"
+                      width={300}
+                      height={200}
+                      className="rounded border mt-2"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          </Modal>
+        )}
       </Container>
     </div>
   );

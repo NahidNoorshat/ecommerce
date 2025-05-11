@@ -1,4 +1,5 @@
 import React from "react";
+import PriceFormatter from "./PriceFormatter";
 
 const PriceView = ({
   originalPrice,
@@ -8,13 +9,6 @@ const PriceView = ({
   className,
 }) => {
   const hasDiscount = discount && parseFloat(discount) > 0;
-  const formattedOriginal =
-    originalPrice !== null ? `$${parseFloat(originalPrice).toFixed(2)}` : "N/A";
-  const formattedFinal =
-    displayPrice !== null ? `$${parseFloat(displayPrice).toFixed(2)}` : "N/A";
-  const formattedDiscount = hasDiscount
-    ? `${parseFloat(discount).toFixed(2)}% off`
-    : null;
 
   return (
     <div className={`flex flex-col gap-1 ${className || ""}`}>
@@ -23,20 +17,21 @@ const PriceView = ({
       )}
       <div className="flex items-center gap-2">
         {hasDiscount && originalPrice !== null && (
-          <span className="text-gray-500 line-through">
-            {formattedOriginal}
+          <span className="text-gray-500 line-through inline-flex items-center">
+            <PriceFormatter amount={originalPrice} />
           </span>
         )}
         <span
-          className={`font-semibold ${
-            hasDiscount ? "text-red-600" : "text-gray-800"
-          }`}
+          className={`
+            font-semibold inline-flex items-center
+            ${hasDiscount ? "text-red-600" : "text-gray-800"}
+          `}
         >
-          {formattedFinal}
+          <PriceFormatter amount={displayPrice} />
         </span>
-        {hasDiscount && formattedDiscount && (
+        {hasDiscount && (
           <span className="text-sm text-green-600 font-medium">
-            ({formattedDiscount})
+            ({parseFloat(discount).toFixed(2)}% off)
           </span>
         )}
       </div>

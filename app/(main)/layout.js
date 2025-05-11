@@ -4,6 +4,8 @@ import Header from "@/components/Header";
 import ReduxProvider from "./ReduxProvider";
 import UserLoader from "./UserLoader";
 import { Toaster } from "@/components/ui/sonner";
+import NotificationProvider from "@/components/NotificationProvider";
+import LoginModal from "@/components/LoginModal";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,9 +30,12 @@ export default function RootLayout({ children }) {
       >
         <ReduxProvider>
           <UserLoader />
-          <Header />
-          {children}
-          <Toaster />
+          <NotificationProvider>
+            <Header />
+            {children}
+            <LoginModal />
+            <Toaster />
+          </NotificationProvider>
         </ReduxProvider>
       </body>
     </html>

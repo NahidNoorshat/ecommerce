@@ -2,8 +2,17 @@
 
 import { useState, useEffect } from "react";
 import axios from "axios";
+
 import { toast } from "sonner";
 import { PRODUCTS_API } from "@/utils/config";
+
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Bold from "@tiptap/extension-bold";
+import Italic from "@tiptap/extension-italic";
+import Underline from "@tiptap/extension-underline";
+import BulletList from "@tiptap/extension-bullet-list";
+import ListItem from "@tiptap/extension-list-item";
 
 const initialProductData = {
   name: "",
@@ -18,6 +27,8 @@ const initialProductData = {
   status: "NEW",
   has_variants: false,
   variants: [],
+  certificate_description: "", // ✅ optional but good for consistency
+  certificate_file: null, // ✅ optional but managed separately
 };
 
 const VariantForm = ({
@@ -150,6 +161,7 @@ const VariantForm = ({
 
 export default function AddProductForm() {
   const [productData, setProductData] = useState(initialProductData);
+  const [certificateFile, setCertificateFile] = useState(null);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [uploadedImagePreviews, setUploadedImagePreviews] = useState([]);
   const [mainImageIndex, setMainImageIndex] = useState(0);
@@ -159,6 +171,15 @@ export default function AddProductForm() {
   const [variantAttributeValues, setVariantAttributeValues] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  const editor = useEditor({
+    extensions: [StarterKit, Bold, Italic, Underline, BulletList, ListItem],
+    content: productData.certificate_description,
+    onUpdate: ({ editor }) => {
+      const html = editor.getHTML();
+      setProductData((prev) => ({ ...prev, certificate_description: html }));
+    },
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -188,6 +209,23 @@ export default function AddProductForm() {
       variantPreviews.forEach((preview) => URL.revokeObjectURL(preview));
     };
   }, [uploadedImagePreviews, variantPreviews]);
+
+  const handleCertificateFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const isValidType = ["application/pdf", "image/jpeg", "image/png"].includes(
+      file.type
+    );
+    if (!isValidType) {
+      toast.error("Only PDF or image files are allowed for certificate.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Certificate file must be under 5MB.");
+      return;
+    }
+    setCertificateFile(file);
+  };
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
@@ -273,7 +311,6 @@ export default function AddProductForm() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Validate required fields
     if (
       !productData.name ||
       !productData.description ||
@@ -332,7 +369,6 @@ export default function AddProductForm() {
       formData.append("stock", productData.stock.toString());
     }
 
-    // Append multiple images
     uploadedImages.forEach((img) => formData.append("uploaded_images", img));
     formData.append("main_image_index", mainImageIndex.toString());
 
@@ -350,20 +386,25 @@ export default function AddProductForm() {
       });
     }
 
-    // Debugging: Log FormData contents
-    for (let [key, value] of formData.entries()) {
-      console.log(`${key}:`, value);
-    }
+    // ✅ Certificate fields
+    if (productData.certificate_description)
+      formData.append(
+        "certificate_description",
+        productData.certificate_description
+      );
+    if (certificateFile) formData.append("certificate_file", certificateFile);
 
     try {
       const response = await axios.post(`${PRODUCTS_API}/products/`, formData);
-      console.log("Response:", response.data);
       toast.success("Product added successfully!");
       setProductData(initialProductData);
       setUploadedImages([]);
       setUploadedImagePreviews([]);
       setMainImageIndex(0);
       setVariantPreviews([]);
+      editor?.commands.clearContent();
+
+      setCertificateFile(null);
     } catch (error) {
       console.error("Error:", error);
       const errorMsg =
@@ -548,6 +589,82 @@ export default function AddProductForm() {
               <option value="OUT_OF_STOCK">Out of Stock</option>
             </select>
           </div>
+          {/* ✅ Certificate Description */}
+          <div className="mb-6">
+            <label
+              htmlFor="certificate_description"
+              className="block text-sm font-medium mb-2"
+            >
+              Certificate Description (Rich Text)
+            </label>
+
+            {editor && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => editor.chain().focus().toggleBold().run()}
+                  className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-sm rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  Bold
+                </button>
+                <button
+                  type="button"
+                  onClick={() => editor.chain().focus().toggleItalic().run()}
+                  className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-sm rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  Italic
+                </button>
+                <button
+                  type="button"
+                  onClick={() => editor.chain().focus().toggleUnderline().run()}
+                  className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-sm rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  Underline
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    editor.chain().focus().toggleBulletList().run()
+                  }
+                  className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-sm rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  Bullet List
+                </button>
+              </div>
+            )}
+
+            <div className="w-full bg-white dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 min-h-[200px]">
+              <EditorContent
+                editor={editor}
+                className="w-full p-3 outline-none prose prose-sm dark:prose-invert min-h-[150px] max-w-full"
+                style={{
+                  maxWidth: "100%",
+                  minHeight: "150px",
+                  height: "auto",
+                }}
+              />
+            </div>
+          </div>
+
+          {/* ✅ Certificate File */}
+          <div className="mb-6">
+            <label
+              htmlFor="certificate_file"
+              className="block text-sm font-medium mb-2"
+            >
+              Upload Certificate File (PDF or Image)
+            </label>
+            <div className="relative w-full">
+              <input
+                type="file"
+                id="certificate_file"
+                name="certificate_file"
+                accept=".pdf,image/*"
+                className="block w-full text-sm text-gray-900 dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-600 dark:file:text-white dark:hover:file:bg-gray-500 cursor-pointer"
+              />
+            </div>
+          </div>
+
           <div className="mb-4">
             <label
               htmlFor="category"

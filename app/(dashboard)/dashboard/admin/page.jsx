@@ -115,19 +115,22 @@ const DashboardPage = () => {
   const cardData = [
     {
       title: "Total Revenue",
-      value: `$${stats.total_revenue.toLocaleString()}`,
+      value: stats.total_revenue,
+      isCurrency: true, // ✅ Add this flag
       icon: <FaDollarSign />,
       chartData: trendData.revenue_trend.map((v) => ({ value: v })),
     },
     {
       title: "Total Orders",
       value: stats.total_orders,
+      isCurrency: false,
       icon: <FaShoppingCart />,
       chartData: trendData.order_trend.map((v) => ({ value: v })),
     },
     {
       title: "Total Customers",
       value: stats.total_users,
+      isCurrency: false,
       icon: <FaUsers />,
       chartData: trendData.user_trend.map((v) => ({ value: v })),
     },
@@ -143,6 +146,7 @@ const DashboardPage = () => {
             value={stat.value}
             chartData={stat.chartData}
             icon={stat.icon}
+            isCurrency={stat.isCurrency}
           />
         ))}
       </div>

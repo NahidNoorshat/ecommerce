@@ -1,5 +1,6 @@
 "use client";
-import React, { useCallback, useEffect } from "react";
+
+import React, { useCallback, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchCart,
@@ -11,6 +12,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import PriceFormatter from "@/components/PriceFormatter";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 const CartItem = React.memo(
   ({ item, activeAction, onIncrease, onDecrease, onRemove }) => {
@@ -18,14 +20,22 @@ const CartItem = React.memo(
     const isDecreasing = activeAction === `decrease-${item.id}`;
     const isRemoving = activeAction === `remove-${item.id}`;
 
+    // Use main_image.image with a fallback
+    const productImage =
+      item.product.main_image?.image || "https://via.placeholder.com/150";
+
     return (
       <div className="flex flex-col sm:flex-row items-center justify-between border p-4 rounded-md shadow-sm">
         <div className="flex items-center space-x-4">
-          <img
-            src={item.product.image || "/placeholder.png"}
-            alt={item.product.name}
-            className="w-20 h-20 object-cover rounded"
-          />
+          <div className="relative w-20 h-20">
+            <Image
+              src={productImage}
+              alt={item.product.main_image?.alt_text || item.product.name}
+              fill
+              className="object-cover rounded"
+              loading="lazy"
+            />
+          </div>
           <div>
             <h3 className="text-lg font-semibold">{item.product.name}</h3>
             {item.variant && (
@@ -33,7 +43,9 @@ const CartItem = React.memo(
                 Variant:{" "}
                 {item.variant.attributes &&
                 Array.isArray(item.variant.attributes)
-                  ? item.variant.attributes.map((attr) => attr.value).join(", ")
+                  ? item.variant.attributes
+                      .map((attr) => attr.value ?? "N/A")
+                      .join(", ")
                   : "N/A"}
               </p>
             )}
@@ -51,6 +63,7 @@ const CartItem = React.memo(
               onClick={() => onDecrease(item.id, item.quantity)}
               disabled={isDecreasing}
               className="px-2 py-1 bg-gray-200 text-gray-800 hover:bg-gray-300"
+              aria-label={`Decrease quantity of ${item.product.name}`}
             >
               -
             </Button>
@@ -62,6 +75,7 @@ const CartItem = React.memo(
                 item.quantity >= (item.variant?.stock || item.product.stock)
               }
               className="px-2 py-1 bg-gray-200 text-gray-800 hover:bg-gray-300"
+              aria-label={`Increase quantity of ${item.product.name}`}
             >
               +
             </Button>
@@ -80,6 +94,7 @@ const CartItem = React.memo(
             disabled={isRemoving}
             variant="destructive"
             className="bg-red-600 text-white hover:bg-red-700 hover:text-white disabled:bg-red-300 disabled:text-white"
+            aria-label={`Remove ${item.product.name} from cart`}
           >
             Remove
           </Button>
@@ -96,24 +111,28 @@ const CartPage = () => {
     (state) => state.cart
   );
 
-  console.log("CartPage rendered with items:", JSON.stringify(items));
-
   useEffect(() => {
     const token = localStorage.getItem("access");
     if (!token) {
       toast.error("Please log in to view your cart");
+      dispatch(resetCart());
       router.push("/login");
     } else {
-      console.log("Fetching cart with token:", token.slice(0, 10) + "...");
+      if (process.env.NODE_ENV === "development") {
+        console.log("Fetching cart with token:", token.slice(0, 10) + "...");
+      }
       dispatch(fetchCart());
     }
   }, [dispatch, router]);
 
   useEffect(() => {
-    if (status === "succeeded" && items.length > 0) {
-      console.log("Cart items updated:", items.length);
+    if (error?.status === "401") {
+      toast.error(error.message);
+      localStorage.removeItem("access");
+      dispatch(resetCart());
+      router.push("/login");
     }
-  }, [items, status]);
+  }, [error, router, dispatch]);
 
   const handleIncrease = useCallback(
     async (cartItemId, currentQuantity) => {
@@ -121,12 +140,6 @@ const CartPage = () => {
         const item = items.find((i) => i.id === cartItemId);
         const stock = item.variant?.stock || item.product.stock;
         const newQuantity = currentQuantity + 1;
-        console.log("Increasing cart item:", {
-          id: cartItemId,
-          currentQuantity,
-          newQuantity,
-          stock,
-        });
         if (newQuantity > stock) {
           toast.info(`Maximum stock reached (${stock} available)`);
           return;
@@ -136,7 +149,9 @@ const CartPage = () => {
         ).unwrap();
         toast.success("Quantity increased!");
       } catch (err) {
-        console.error("Handle increase error:", err);
+        if (process.env.NODE_ENV === "development") {
+          console.error("Handle increase error:", err);
+        }
         const errorMessage =
           err?.data?.quantity || err.message || "Failed to update quantity";
         toast.error(errorMessage);
@@ -180,10 +195,29 @@ const CartPage = () => {
     [dispatch]
   );
 
-  const cartTotal = items.reduce((total, item) => {
-    const price = item.variant ? item.variant.price : item.product.price;
-    return total + price * item.quantity;
-  }, 0);
+  const cartTotal = useMemo(
+    () =>
+      items.reduce((total, item) => {
+        const price = item.variant ? item.variant.price : item.product.price;
+        return total + price * item.quantity;
+      }, 0),
+    [items]
+  );
+
+  const handleCheckout = () => {
+    const outOfStockItems = items.filter(
+      (item) => item.quantity > (item.variant?.stock || item.product.stock)
+    );
+    if (outOfStockItems.length > 0) {
+      toast.error(
+        `Some items are out of stock: ${outOfStockItems
+          .map((item) => item.product.name)
+          .join(", ")}`
+      );
+      return;
+    }
+    router.push("/checkout");
+  };
 
   const activeAction =
     status === "loading" && lastAction
@@ -191,20 +225,26 @@ const CartPage = () => {
       : null;
 
   if (status === "loading" && items.length === 0) {
-    return <div className="text-center py-10">Loading cart...</div>;
+    return (
+      <div className="text-center py-10" aria-live="polite">
+        Loading cart...
+      </div>
+    );
   }
 
   if (error) {
-    console.log(
-      "Cart error details:",
-      error,
-      "Status:",
-      status,
-      "Items:",
-      items
-    );
+    if (process.env.NODE_ENV === "development") {
+      console.log(
+        "Cart error details:",
+        error,
+        "Status:",
+        status,
+        "Items:",
+        items
+      );
+    }
     return (
-      <div className="text-center py-10 text-red-500">
+      <div className="text-center py-10 text-red-500" aria-live="assertive">
         Error: {error.message || "Something went wrong"} (Status: {error.status}
         )
         {error.message === "Only customers can access the cart." && (
@@ -250,9 +290,7 @@ const CartPage = () => {
         <Button onClick={() => router.push("/")} variant="outline">
           Continue Shopping
         </Button>
-        <Button onClick={() => router.push("/checkout")}>
-          Proceed to Checkout
-        </Button>
+        <Button onClick={handleCheckout}>Proceed to Checkout</Button>
       </div>
     </div>
   );

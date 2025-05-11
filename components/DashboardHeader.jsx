@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { IoNotificationsOutline } from "react-icons/io5";
 import { FaRegMessage } from "react-icons/fa6";
 import Image from "next/image";
+import { refreshNotifications } from "@/utils/notifications";
+
 import { useDispatch, useSelector } from "react-redux";
 import {
   DropdownMenu,
@@ -26,6 +28,8 @@ export default function DashboardHeader() {
   const user = useSelector((state) => state.user.user);
   const dispatch = useDispatch();
   const router = useRouter();
+  const notifications = useSelector((state) => state.notifications.items);
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   useEffect(() => {
     if (!user) {
@@ -54,8 +58,6 @@ export default function DashboardHeader() {
         router.push("/login");
       }
     }
-    console.log("Redux User:", user);
-    console.log("Local Storage User:", localStorage.getItem("user"));
   }, [user, dispatch, router]);
 
   const handleLogout = async () => {
@@ -124,11 +126,16 @@ export default function DashboardHeader() {
               1
             </div>
           </div>
-          <div className="rounded-full relative bg-slate-300 w-12 h-12 flex items-center justify-center">
+          <div
+            onClick={() => router.push("/dashboard/admin/notifications")}
+            className="cursor-pointer rounded-full relative bg-slate-300 w-12 h-12 flex items-center justify-center"
+          >
             <IoNotificationsOutline className="text-black w-7 h-7" />
-            <div className="absolute -top-1.5 -right-1 bg-yellow-300 rounded-full w-5 h-5 flex items-center justify-center text-xs text-black">
-              1
-            </div>
+            {unreadCount > 0 && (
+              <div className="absolute -top-1.5 -right-1 bg-yellow-300 rounded-full w-5 h-5 flex items-center justify-center text-xs text-black">
+                {unreadCount}
+              </div>
+            )}
           </div>
         </div>
 

@@ -5,6 +5,7 @@ import { PersistGate } from "redux-persist/integration/react";
 import { store, persistor } from "@/lib/store";
 import Loader from "@/components/Loader";
 import { useEffect, useState } from "react";
+import NotificationProvider from "@/components/NotificationProvider";
 
 export default function ReduxProvider({ children }) {
   const [mounted, setMounted] = useState(false);
@@ -16,7 +17,7 @@ export default function ReduxProvider({ children }) {
   // Optional: Clear old storage if you changed redux structure recently
   useEffect(() => {
     if (mounted && persistor) {
-      persistor.purge(); // Remove this line after first refresh if everything ok
+      // persistor.purge(); // Remove this line after first refresh if everything ok
     }
   }, [mounted]);
 

@@ -7,3 +7,5 @@ export const USER_AUTH = `${API_BASE_URL}/newauth`;
 export const ANALYTICS_API = `${API_BASE_URL}/analytics`;
 export const BANNER_API = `${API_BASE_URL}/banners`;
 export const CATEGORIES_API = `${PRODUCTS_API}/categories`;
+export const REVIEWS_API = `${API_BASE_URL}/reviews`;
+export const NOTIFICATIONS_API = `${API_BASE_URL}/notifications`;

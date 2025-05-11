@@ -11,8 +11,15 @@ import {
   Area,
   defs,
 } from "recharts";
+import PriceFormatter from "../PriceFormatter";
 
-const DashboardCard = ({ title, value, percentageChange, chartData }) => {
+const DashboardCard = ({
+  title,
+  value,
+  percentageChange,
+  chartData,
+  isCurrency = false,
+}) => {
   const { theme } = useTheme();
 
   const isDark = theme === "dark";
@@ -26,7 +33,14 @@ const DashboardCard = ({ title, value, percentageChange, chartData }) => {
           {title}
         </CardTitle>
         <div className="text-2xl font-bold text-black dark:text-white">
-          {value}
+          {isCurrency ? (
+            <PriceFormatter
+              amount={value}
+              className="text-2xl font-bold [&>span]:text-2xl [&>span]:leading-tight"
+            />
+          ) : (
+            value
+          )}
         </div>
         {percentageChange && (
           <p className="text-xs text-muted-foreground">{percentageChange}</p>

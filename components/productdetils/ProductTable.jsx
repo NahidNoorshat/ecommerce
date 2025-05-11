@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import Defoult_Image from "../../public/ecommerce_images/back-5.jpg";
 import { getStockBadge } from "@/utils/getStockBadge";
 import ProductSkeletonRow from "../lazyloading/ProductSkeletonRow";
+import PriceFormatter from "../PriceFormatter";
 
 export default function ProductTable() {
   const [products, setProducts] = useState([]);
@@ -370,7 +371,9 @@ export default function ProductTable() {
                   </TableCell>
                   <TableCell>{product.name}</TableCell>
                   <TableCell>{product.category?.name}</TableCell>
-                  <TableCell>${product.price}</TableCell>
+                  <TableCell>
+                    <PriceFormatter amount={product.price} />
+                  </TableCell>
                   <TableCell>
                     <span
                       className={`text-xs font-semibold px-2 py-1 rounded-full ${
@@ -433,7 +436,8 @@ export default function ProductTable() {
                               className="flex items-center gap-2"
                             >
                               <span>
-                                {variant.variant_name} - ${variant.price}{" "}
+                                {variant.variant_name} -
+                                <PriceFormatter amount={variant.price} />
                                 (Stock: {variant.stock})
                               </span>
                               <div className="relative w-8 h-8">
@@ -479,7 +483,9 @@ export default function ProductTable() {
               </div>
               <div className="flex-1 space-y-2">
                 <h3 className="font-semibold text-lg">{product.name}</h3>
-                <p className="text-sm text-gray-700">${product.price}</p>
+                <p className="text-sm text-gray-700">
+                  <PriceFormatter amount={product.price} />
+                </p>
                 <p
                   className={`text-xs font-medium inline-block px-2 py-0.5 rounded-full mt-1 ${
                     getStockBadge(product.stock).color

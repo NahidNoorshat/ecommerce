@@ -1,15 +1,21 @@
+import { TbCurrencyTaka } from "react-icons/tb";
 import { twMerge } from "tailwind-merge";
 
 const PriceFormatter = ({ amount, className }) => {
-  const formattedPrice = Number(amount).toLocaleString("en-US", {
-    currency: "USD",
-    style: "currency",
+  const formattedAmount = Number(amount).toLocaleString("en-BD", {
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 
   return (
-    <span className={twMerge("text-sm font-semibold text-darkText", className)}>
-      {formattedPrice}
+    <span
+      className={twMerge(
+        "text-sm font-semibold text-darkText inline-flex items-center",
+        className
+      )}
+    >
+      <TbCurrencyTaka className="text-base" />
+      {formattedAmount}
     </span>
   );
 };

@@ -5,16 +5,20 @@ import Link from "next/link";
 import Image from "next/image";
 import React, { useState, useTransition } from "react";
 import Container from "./Container";
-import logo from "../public/ecommerce_images/logo.png";
+// import logo from "../public/ecommerce_images/logo3.jpg";
+import logo from "../public/ecommerce_images/logo4.png";
 import CartIcon from "./CartIcon";
 import { BsBasket } from "react-icons/bs";
 import UserHeader from "./UserHeader";
 import CategoryDropdown from "./CategoryDropdown";
+import NotificationBell from "./NotificationBell";
+import { useSelector } from "react-redux";
 
 const Header = () => {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [isPending, startTransition] = useTransition();
+  const user = useSelector((state) => state.user.user);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -73,6 +77,7 @@ const Header = () => {
           {/* Cart, User, Orders */}
           <div className="flex items-center space-x-4 flex-1 sm:flex-none">
             <CartIcon />
+
             <UserHeader />
             <Link
               href="/orders"
@@ -86,6 +91,7 @@ const Header = () => {
                 <p className="font-semibold">Orders</p>
               </div>
             </Link>
+            {user?.username && <NotificationBell />}
           </div>
         </header>
       </Container>

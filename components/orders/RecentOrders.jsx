@@ -16,6 +16,9 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
+import { refreshNotifications } from "@/utils/notifications";
+import { useDispatch } from "react-redux";
+import PriceFormatter from "../PriceFormatter";
 
 const statusColors = {
   pending: "bg-yellow-500 text-white",
@@ -44,6 +47,7 @@ const paymentMethodOptions = ["cod", "card", "paypal", "crypto"];
 
 export default function RecentOrders({ status = "" }) {
   const router = useRouter();
+  const dispatch = useDispatch();
   const [orders, setOrders] = useState([]);
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [search, setSearch] = useState("");
@@ -91,6 +95,10 @@ export default function RecentOrders({ status = "" }) {
         body: JSON.stringify({ payment_status: newStatus }),
       }
     );
+
+    if (newStatus === "delivered") {
+      await refreshNotifications(dispatch); // 👈 only refresh if it's delivered
+    }
     fetchOrders();
     toast.success("Payment Status Updated!");
   };
@@ -206,7 +214,10 @@ export default function RecentOrders({ status = "" }) {
                   <TableCell>
                     {new Date(order.updated_at).toLocaleDateString()}
                   </TableCell>
-                  <TableCell>${order.total_price}</TableCell>
+                  <TableCell>
+                    <PriceFormatter amount={order.total_price} />
+                  </TableCell>
+
                   <TableCell>
                     <Badge
                       className={paymentStatusColors[order.payment_status]}
@@ -295,7 +306,8 @@ export default function RecentOrders({ status = "" }) {
                 {new Date(order.updated_at).toLocaleDateString()}
               </div>
               <div>
-                <strong>Amount:</strong>${order.total_price}
+                <strong>Amount:</strong>{" "}
+                <PriceFormatter amount={order.total_price} />
               </div>
               <div>
                 <strong>Payment:</strong>
