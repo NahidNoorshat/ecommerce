@@ -2,36 +2,59 @@
 
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { setUser, setError, clearUser } from "@/lib/feature/users/userSlice";
-import { USER_AUTH } from "@/utils/config";
-import { secureFetch } from "@/lib/api/secureFetch";
+import { useRouter } from "next/navigation";
+import {
+  setUser,
+  setLoading,
+  setError,
+  clearUser,
+} from "@/lib/feature/users/userSlice";
+import { USERS_API } from "@/utils/config";
+import secureAxios from "@/lib/api/secureAxios";
+import { handleSessionExpiration } from "@/lib/api/auth";
 
 export default function UserLoader() {
   const dispatch = useDispatch();
-  const user = useSelector((state) => state.user.user);
+  const router = useRouter();
+  const { user } = useSelector((state) => state.user);
 
   useEffect(() => {
     const fetchUser = async () => {
-      const accessToken = localStorage.getItem("access");
+      const accessToken =
+        typeof window !== "undefined" && localStorage.getItem("access");
 
-      if (accessToken && !user) {
-        try {
-          const res = await secureFetch(`${USER_AUTH}/user/`);
-          if (!res || !res.ok)
-            throw new Error("Session expired or unauthorized.");
+      // ✅ Skip if no token or user already exists
+      if (!accessToken || user) return;
 
-          const data = await res.json();
-          dispatch(setUser(data));
-        } catch (err) {
-          console.error("Failed to fetch user details:", err);
-          dispatch(setError(err.message));
-          dispatch(clearUser());
-        }
+      // ✅ Start loading
+      dispatch(setLoading());
+
+      try {
+        const res = await secureAxios.get(`${USERS_API}/me/`);
+        const data = res.data;
+
+        const userData = {
+          id: data.id,
+          username: data.username,
+          role: data.role,
+          email: data.email,
+          phone_number: data.phone_number,
+          address: data.address,
+          is_verified: data.is_verified,
+          profile_picture:
+            data.profile_picture?.replace(/^\/api\/newauth/, "") || null,
+        };
+
+        dispatch(setUser(userData));
+      } catch (err) {
+        console.error("❌ Failed to fetch user:", err);
+        dispatch(setError(err.message));
+        await handleSessionExpiration(dispatch); // 🚪 logout + redirect
       }
     };
 
     fetchUser();
-  }, [dispatch, user]);
+  }, [dispatch, router, user]);
 
-  return null;
+  return null; // no UI needed
 }

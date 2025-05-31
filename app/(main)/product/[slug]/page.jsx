@@ -3,7 +3,7 @@
 import AddToCartButton from "@/components/AddToCartButton";
 import Container from "@/components/Container";
 import PriceView from "@/components/PriceView";
-import Loader from "@/components/Loader"; // Import the new Loader component
+import Loader from "@/components/Loader";
 import { PRODUCTS_API } from "@/utils/config";
 import axios from "axios";
 import Image from "next/image";
@@ -16,8 +16,11 @@ import ReviewForm from "@/components/ReviewForm";
 import StarRatingDisplay from "@/components/StarRatingDisplay";
 import { HiBadgeCheck } from "react-icons/hi";
 import Modal from "@/components/Modal";
+import ChatModal from "@/components/ChatModal";
+import { useSelector } from "react-redux";
 
 const ProductPage = ({ params: paramsPromise }) => {
+  const user = useSelector((state) => state.user.user);
   const [product, setProduct] = useState(null);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [selectedAttributes, setSelectedAttributes] = useState({});
@@ -26,6 +29,7 @@ const ProductPage = ({ params: paramsPromise }) => {
   const [attributesMap, setAttributesMap] = useState({});
   const params = React.use(paramsPromise);
   const [showVerification, setShowVerification] = useState(false);
+  const [showChat, setShowChat] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -61,7 +65,6 @@ const ProductPage = ({ params: paramsPromise }) => {
     mutate,
   } = useReviews(product?.id || null);
 
-  // Use the new Loader component during loading state
   if (!product && !error) {
     return <Loader />;
   }
@@ -109,6 +112,11 @@ const ProductPage = ({ params: paramsPromise }) => {
   };
 
   const stockQuantity = selectedVariant?.stock ?? product?.stock ?? 0;
+
+  // Generate roomId for ChatModal
+  const roomId = user?.id
+    ? `product_${product.id}_user_${user.id}`
+    : `product_${product.id}_user_11`; // Fallback user ID
 
   return (
     <div>
@@ -177,7 +185,7 @@ const ProductPage = ({ params: paramsPromise }) => {
             className="text-lg font-bold"
           />
 
-          <div className="flex items-center  gap-4">
+          <div className="flex items-center gap-4">
             <p
               className={`text-sm px-4 py-2.5 font-semibold rounded-lg ${
                 stockQuantity > 0
@@ -193,7 +201,7 @@ const ProductPage = ({ params: paramsPromise }) => {
             {product.is_verified && (
               <button
                 onClick={() => setShowVerification(true)}
-                className="flex items-center gap-1  bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-2 rounded-full shadow hover:bg-blue-200 transition"
+                className="flex items-center gap-1 bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-2 rounded-full shadow hover:bg-blue-200 transition"
               >
                 <HiBadgeCheck className="w-4 h-4 text-blue-600" />
                 Verified
@@ -263,6 +271,12 @@ const ProductPage = ({ params: paramsPromise }) => {
           ) : (
             <AddToCartButton product={product} />
           )}
+          <button
+            onClick={() => setShowChat(true)}
+            className="w-full px-4 py-2 rounded-md bg-blue-600 text-white font-medium mt-2 hover:bg-blue-700 transition"
+          >
+            💬 Message Seller
+          </button>
 
           {/* Reviews */}
           <div className="max-w-3xl mt-12 border-t pt-8">
@@ -339,6 +353,13 @@ const ProductPage = ({ params: paramsPromise }) => {
               )}
             </div>
           </Modal>
+        )}
+        {showChat && (
+          <ChatModal
+            productId={product.id}
+            roomId={roomId}
+            onClose={() => setShowChat(false)}
+          />
         )}
       </Container>
     </div>

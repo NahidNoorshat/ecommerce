@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CATEGORIES_API } from "@/utils/config";
+import secureAxios from "@/lib/api/secureAxios";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,8 +22,8 @@ export default function CategoryDropdown() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch(`${CATEGORIES_API}/`);
-        const data = await response.json();
+        const response = await secureAxios.get(`${CATEGORIES_API}/`);
+        const data = response.data;
         const categoriesArray = Array.isArray(data) ? data : data.results || [];
         setCategories(buildCategoryTree(categoriesArray));
       } catch (error) {

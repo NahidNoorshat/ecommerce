@@ -1,11 +1,8 @@
+// app/(main)/layout.js
 import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";
-import Header from "@/components/Header";
 import ReduxProvider from "./ReduxProvider";
-import UserLoader from "./UserLoader";
-import { Toaster } from "@/components/ui/sonner";
-import NotificationProvider from "@/components/NotificationProvider";
-import LoginModal from "@/components/LoginModal";
+import ClientWrapper from "./ClientWrapper"; // ✅ import wrapper
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,13 +26,7 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ReduxProvider>
-          <UserLoader />
-          <NotificationProvider>
-            <Header />
-            {children}
-            <LoginModal />
-            <Toaster />
-          </NotificationProvider>
+          <ClientWrapper>{children}</ClientWrapper>
         </ReduxProvider>
       </body>
     </html>
