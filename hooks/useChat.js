@@ -55,6 +55,11 @@ export default function useChat({ productId, customerId = null }) {
     const wsUrl = `${WEBSOCKET_URL}/ws/chat/${currentRoomName}/?token=${encodeURIComponent(
       token
     )}`;
+
+    console.log(
+      wsUrl,
+      "let check in server what actualy this url comming......"
+    );
     wsRef.current = new WebSocket(wsUrl);
 
     // Ping interval (keepalive)
