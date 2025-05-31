@@ -10,6 +10,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { useSelector, useDispatch } from "react-redux";
 import { setServerDown } from "@/lib/feature/server/serverSlice";
 import Loader from "@/components/Loader";
+import { API_BASE_URL } from "@/utils/config";
 
 export default function ClientWrapper({ children }) {
   const dispatch = useDispatch();
@@ -22,7 +23,7 @@ export default function ClientWrapper({ children }) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
 
-      const res = await fetch("http://127.0.0.1:8000/api/health-check/", {
+      const res = await fetch(`${API_BASE_URL}/api/health-check/`, {
         signal: controller.signal,
         cache: "no-store",
         headers: { Accept: "application/json" },
